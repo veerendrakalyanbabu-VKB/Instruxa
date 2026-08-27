@@ -29,5 +29,5 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Lint
         run: npm run lint
-      - name: Validate Cloudflare Pages export
-        run: npm run build:pages
+      - name: Validate production Worker build
+        run: npm run build
