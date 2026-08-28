@@ -1,27 +1,52 @@
 # Security Policy
 
-## Supported versions
+## Supported version
 
-Instruxa is currently a pre-production MVP. Only the latest deployment and the `main` branch are supported.
+Instruxa is an active private-beta product. Only the latest `main` deployment is supported.
 
 ## Reporting a vulnerability
 
-Please do not create a public GitHub issue for suspected vulnerabilities, exposed credentials, authentication bypasses, billing problems, or private-data exposure.
+Do not create a public issue for suspected vulnerabilities, exposed credentials, authentication bypasses, cross-account access, billing errors, or private-data exposure.
 
-Report the issue privately to the repository owner through the contact method listed on the owner's GitHub profile. Include:
+Report privately through the repository owner's GitHub contact channel. Include:
 
-- A concise description
-- The affected route, component, or commit
-- Reproduction steps
-- Potential impact
+- Concise description and impact
+- Affected route, component, or commit
+- Safe reproduction steps
+- Relevant request identifiers with secrets removed
 - Suggested mitigation, if known
 
-Do not include real credentials, personal data, or destructive proof-of-concept payloads.
+Never include real API keys, passwords, session cookies, private prompts, customer information, or destructive payloads.
+
+## Implemented controls
+
+- PBKDF2-SHA-256 password derivation with per-user random salts
+- Random opaque sessions with stored SHA-256 token digests
+- `HttpOnly`, `Secure`, `SameSite=Lax` cookies
+- Authenticated and user-scoped project, key, usage, and run APIs
+- AES-256-GCM encryption for provider keys
+- Runtime-only BYOK master secret
+- No provider-key return path to the browser
+- Bounded prompt, key, and model inputs
+- Per-user generation rate limiting
+- Bounded retries for transient provider failures
+- Failed-call included-credit refunds
+- `Cache-Control: no-store` on private JSON APIs
+- Secrets excluded by `.gitignore`
+
+## Current limitations
+
+The private beta does not yet include email verification, password recovery, multi-factor authentication, organization RBAC, formal audit retention, automated key rotation, subscription billing, or an external penetration test. The deterministic evaluator is not a factual-accuracy guarantee.
+
+## Operator responsibilities
+
+- Store `BYOK_MASTER_KEY` only as a Cloudflare Worker secret.
+- Restrict Cloudflare and GitHub administrative access.
+- Apply D1 migrations in order and test backups.
+- Rotate secrets after suspected exposure.
+- Never paste production secrets into issues, commits, screenshots, or build logs.
+- Review provider data-processing settings before enabling platform-funded keys.
 
 ## Response process
 
-Reports will be acknowledged, assessed for severity, reproduced safely, remediated, and disclosed after a fix when appropriate. No guaranteed response SLA applies during the MVP stage.
-
-## Current data boundary
-
-The public MVP compiles prompts locally in the browser. It does not currently provide production authentication, persistent user storage, payment processing, or live third-party model requests.
+Reports will be acknowledged, triaged, reproduced safely, remediated, and disclosed after a fix when appropriate. No contractual response SLA applies during private beta.
