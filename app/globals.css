@@ -27,3 +27,5 @@
 .run-history>button:hover{border-color:#8b5cf63d;background:#8b5cf60a}.run-history>button span{overflow:hidden;color:#bbb7c5;font-size:10px;text-overflow:ellipsis;white-space:nowrap}.run-history>button small{color:#555560;font-size:8px}
 @keyframes runner-spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.runner-output-head{flex-wrap:wrap}.runner-output-head small{order:4;width:100%;margin-left:0}.model-markdown{padding:18px;font-size:12px}}
+
+.model-sync{display:flex;align-items:center;gap:5px;color:#5f8f7c!important;font-size:9px!important;font-weight:500!important;letter-spacing:0!important}.model-sync:before{content:"";width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}
