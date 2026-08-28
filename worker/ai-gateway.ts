@@ -57,6 +57,28 @@ function evaluate(prompt:string,text:string):Evaluation{
 }
 function parseEvaluation(value:unknown){try{return JSON.parse(String(value||"{}")) as Evaluation}catch{return null}}
 
+async function openProviderStream(provider:AiProvider,model:string,prompt:string,key:string){
+ if(provider==="openai")return fetchWithRetry("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:`Bearer ${key}`,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,max_output_tokens:1800,stream:true})});
+ if(provider==="anthropic")return fetchWithRetry("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},body:JSON.stringify({model,max_tokens:1800,stream:true,messages:[{role:"user",content:prompt}]})});
+ return fetchWithRetry("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":key,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,store:false,stream:true})});
+}
+function streamEvent(provider:AiProvider,data:Record<string,unknown>){
+ if(provider==="openai"){
+  if(data.type==="response.output_text.delta")return{text:String(data.delta??"")};
+  const response=data.response as {usage?:{input_tokens?:number;output_tokens?:number}}|undefined;if(data.type==="response.completed")return{usage:{inputTokens:Number(response?.usage?.input_tokens??0),outputTokens:Number(response?.usage?.output_tokens??0)}};
+ }
+ if(provider==="anthropic"){
+  const delta=data.delta as {type?:string;text?:string}|undefined;if(data.type==="content_block_delta"&&delta?.type==="text_delta")return{text:String(delta.text??"")};
+  if(data.type==="message_start"){const message=data.message as {usage?:{input_tokens?:number;output_tokens?:number}}|undefined;return{usage:{inputTokens:Number(message?.usage?.input_tokens??0),outputTokens:Number(message?.usage?.output_tokens??0)}}}
+  if(data.type==="message_delta"){const usage=data.usage as {output_tokens?:number}|undefined;return{usage:{outputTokens:Number(usage?.output_tokens??0)}}}
+ }
+ if(provider==="gemini"){
+  const delta=data.delta as {type?:string;text?:string}|undefined;if(data.event_type==="step.delta"&&delta?.type==="text")return{text:String(delta.text??"")};
+  if(data.event_type==="interaction.completed"){const interaction=data.interaction as {usage?:{total_input_tokens?:number;total_output_tokens?:number}}|undefined;return{usage:{inputTokens:Number(interaction?.usage?.total_input_tokens??0),outputTokens:Number(interaction?.usage?.total_output_tokens??0)}}}
+ }
+ return{};
+}
+
 async function callProvider(provider:AiProvider,model:string,prompt:string,key:string){
   if(provider==="openai"){
     const response=await fetchWithRetry("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:`Bearer ${key}`,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,max_output_tokens:1800})});
@@ -129,6 +151,33 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
   }
   if(url.pathname==="/api/ai/usage"&&method==="GET"){
    const events=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,input_tokens AS inputTokens,output_tokens AS outputTokens,credits_used AS creditsUsed,status,created_at AS createdAt FROM usage_events WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();return j({events:events.results});
+  }
+  if(url.pathname==="/api/ai/generate-stream"&&method==="POST"){
+   const input=await request.json() as Record<string,unknown>,provider=providerOf(input.provider),prompt=String(input.prompt??"").trim(),mode=input.mode==="included"?"included":"byok";
+   if(!provider||prompt.length<3||prompt.length>30000)return j({error:"Provider and a prompt between 3 and 30,000 characters are required."},400);
+   const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id=? AND created_at > datetime('now','-1 minute')").bind(user.id).first<{count:number}>();if((recent?.count??0)>=10)return j({error:"Rate limit reached. Try again in one minute."},429);
+   const model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider];let key:string|undefined,charged=false;
+   if(mode==="included"){key=platformKey(provider,env);if(!key)return j({error:`Included ${provider} access is not active yet. Connect your own API key.`},503);await env.DB.prepare("INSERT OR IGNORE INTO credit_accounts(user_id,balance) VALUES(?,25)").bind(user.id).run();const charge=await env.DB.prepare("UPDATE credit_accounts SET balance=balance-1,updated_at=datetime('now') WHERE user_id=? AND balance>0").bind(user.id).run();if(!charge.meta.changes)return j({error:"No included credits remain."},402);charged=true}
+   else{const row=await env.DB.prepare("SELECT ciphertext,iv FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,provider).first<{ciphertext:string;iv:string}>();if(!row)return j({error:`Connect a ${provider} API key first.`},400);key=await decrypt(row.ciphertext,row.iv,env)}
+   const eventId=uid(),started=Date.now(),upstream=await openProviderStream(provider,model,prompt,key);
+   if(!upstream.ok){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();let detail=`${provider} request failed`;try{const failure=await upstream.json() as {error?:{message?:string}};detail=failure.error?.message||detail}catch{}return j({error:detail},upstream.status)}
+   const encoder=new TextEncoder(),stream=new ReadableStream<Uint8Array>({async start(controller){
+    let text="",buffer="",inputTokens=0,outputTokens=0;
+    const emit=(data:unknown)=>controller.enqueue(encoder.encode(JSON.stringify(data)+"\n"));
+    try{
+     if(!upstream.body)throw new Error("Provider stream is unavailable.");
+     const reader=upstream.body.getReader(),decoder=new TextDecoder();
+     while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true}).replace(/\r\n/g,"\n");const blocks=buffer.split("\n\n");buffer=blocks.pop()||"";
+      for(const block of blocks){const raw=block.split("\n").filter(line=>line.startsWith("data:")).map(line=>line.slice(5).trimStart()).join("\n");if(!raw||raw==="[DONE]")continue;let data:Record<string,unknown>;try{data=JSON.parse(raw) as Record<string,unknown>}catch{continue}const normalized=streamEvent(provider,data);if("text" in normalized&&normalized.text){text+=normalized.text;emit({type:"delta",text:normalized.text})}if("usage" in normalized&&normalized.usage){inputTokens=normalized.usage.inputTokens??inputTokens;outputTokens=normalized.usage.outputTokens??outputTokens}}
+     }
+     const latencyMs=Date.now()-started,evaluation=evaluate(prompt,text);
+     await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,input_tokens,output_tokens,credits_used,status,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,inputTokens,outputTokens,charged?1:0,"succeeded",latencyMs).run();
+     try{await env.DB.prepare("INSERT INTO ai_runs(id,user_id,provider,model,access_mode,prompt,response_text,input_tokens,output_tokens,latency_ms,evaluation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,prompt,text,inputTokens,outputTokens,latencyMs,JSON.stringify(evaluation)).run()}catch(historyError){if(!String(historyError).includes("no such table"))console.warn("Instruxa stream history write failed",historyError)}
+     const credits=await env.DB.prepare("SELECT balance FROM credit_accounts WHERE user_id=?").bind(user.id).first<{balance:number}>();
+     emit({type:"done",id:eventId,provider,model,inputTokens,outputTokens,latencyMs,evaluation,credits:credits?.balance??25});controller.close();
+    }catch(error){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();const detail=error instanceof Error?error.message:"Streaming failed";try{await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed","STREAM",Date.now()-started).run()}catch{}emit({type:"error",error:detail});controller.close()}
+   }});
+   return new Response(stream,{headers:{"content-type":"application/x-ndjson; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
   }
   if(url.pathname==="/api/ai/generate"&&method==="POST"){
    const input=await request.json() as Record<string,unknown>,provider=providerOf(input.provider),prompt=String(input.prompt??"").trim(),mode=input.mode==="included"?"included":"byok";
