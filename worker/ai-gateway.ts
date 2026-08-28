@@ -28,22 +28,36 @@ async function masterKey(env:AiEnv){
 async function encrypt(secret:string,env:AiEnv){const iv=crypto.getRandomValues(new Uint8Array(12));const data=await crypto.subtle.encrypt({name:"AES-GCM",iv},await masterKey(env),new TextEncoder().encode(secret));return{ciphertext:b64(new Uint8Array(data)),iv:b64(iv)}}
 async function decrypt(ciphertext:string,iv:string,env:AiEnv){const data=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(iv)},await masterKey(env),unb64(ciphertext));return new TextDecoder().decode(data)}
 const platformKey=(provider:AiProvider,env:AiEnv)=>provider==="openai"?env.OPENAI_API_KEY:provider==="anthropic"?env.ANTHROPIC_API_KEY:env.GEMINI_API_KEY;
+const transientStatuses=new Set([408,429,500,502,503,504]);
+const delay=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+async function fetchWithRetry(url:string,init:RequestInit){
+ let response:Response|undefined;
+ for(let attempt=0;attempt<3;attempt++){
+  try{response=await fetch(url,init)}catch(error){if(attempt===2)throw error;await delay(500*(2**attempt)+Math.floor(Math.random()*250));continue}
+  if(!transientStatuses.has(response.status)||attempt===2)return response;
+  const retryAfter=Number(response.headers.get("retry-after"));
+  await response.body?.cancel();
+  await delay(Number.isFinite(retryAfter)&&retryAfter>0?Math.min(retryAfter*1000,5000):700*(2**attempt)+Math.floor(Math.random()*300));
+ }
+ return response as Response;
+}
 
 async function callProvider(provider:AiProvider,model:string,prompt:string,key:string){
   if(provider==="openai"){
-    const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:`Bearer ${key}`,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,max_output_tokens:1800})});
-    const data=await response.json() as OpenAiResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"OpenAI request failed"}`);
+    const response=await fetchWithRetry("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:`Bearer ${key}`,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,max_output_tokens:1800})});
+    const data=await response.json() as OpenAiResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"OpenAI request failed after automatic retries"}`);
     const text=String(data.output_text??data.output?.flatMap(x=>x.content??[]).filter(x=>x.type==="output_text").map(x=>x.text).join("\n")??"");
     return{text,inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
   }
   if(provider==="anthropic"){
-    const response=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},body:JSON.stringify({model,max_tokens:1800,messages:[{role:"user",content:prompt}]})});
-    const data=await response.json() as AnthropicResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Anthropic request failed"}`);
+    const response=await fetchWithRetry("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},body:JSON.stringify({model,max_tokens:1800,messages:[{role:"user",content:prompt}]})});
+    const data=await response.json() as AnthropicResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Anthropic request failed after automatic retries"}`);
     return{text:(data.content??[]).filter(x=>x.type==="text").map(x=>x.text).join("\n"),inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
   }
-  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":key,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,store:false})});
-  const data=await response.json() as GeminiResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Gemini request failed"}`);
-  const text=(data.steps??[]).filter(x=>x.type==="model_output").flatMap(x=>x.content??[]).filter(x=>x.type==="text").map(x=>x.text??"").join("\n");\n  return{text,inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
+  const response=await fetchWithRetry("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":key,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,store:false})});
+  const data=await response.json() as GeminiResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Gemini is still busy after automatic retries. Please try again shortly."}`);
+  const text=(data.steps??[]).filter(x=>x.type==="model_output").flatMap(x=>x.content??[]).filter(x=>x.type==="text").map(x=>x.text??"").join("\n");
+  return{text,inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
 }
 
 export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Promise<Response>{
