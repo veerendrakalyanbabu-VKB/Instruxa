@@ -1,126 +1,202 @@
 # Instruxa
 
-### Engineering-grade prompts, built at the speed of thought.
+<p align="center">
+  <strong>Engineering-grade prompt infrastructure for serious AI builders.</strong>
+</p>
 
-[![Live](https://img.shields.io/badge/live-Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)](https://still-darkness-9403.veerendra-kalyanbabu.workers.dev/)
-[![CI](https://github.com/veerendrakalyanbabu-VKB/Instruxa/actions/workflows/ci.yml/badge.svg)](https://github.com/veerendrakalyanbabu-VKB/Instruxa/actions/workflows/ci.yml)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827)](https://react.dev/)
+<p align="center">
+  Compile intent into structured prompts, execute securely across leading model providers, compare responses, and turn successful experiments into versioned AI assets.
+</p>
 
-**[Launch Instruxa](https://still-darkness-9403.veerendra-kalyanbabu.workers.dev/)** · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](SECURITY.md)
+<p align="center">
+  <a href="https://still-darkness-9403.veerendra-kalyanbabu.workers.dev/"><strong>Launch Instruxa</strong></a>
+  · <a href="docs/ARCHITECTURE.md">Architecture</a>
+  · <a href="docs/ROADMAP.md">Roadmap</a>
+  · <a href="SECURITY.md">Security</a>
+</p>
 
-Instruxa is a premium prompt-engineering workspace for developers, startups, and AI teams. It transforms rough intent into structured, reusable instructions with explicit roles, objectives, requirements, output contracts, and quality criteria.
+<p align="center">
+  <a href="https://github.com/veerendrakalyanbabu-VKB/Instruxa/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/veerendrakalyanbabu-VKB/Instruxa/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827">
+  <img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white">
+  <img alt="D1" src="https://img.shields.io/badge/Database-Cloudflare_D1-F38020">
+</p>
 
-> **Milestone 2 status:** The repository now includes D1-backed email/password accounts, secure cookie sessions, private saved projects, and automatic version snapshots. The production database must be provisioned and migrated before these account features are activated on the public Worker. Live model calls, billing, and teams remain planned.
+> [!IMPORTANT]
+> Instruxa is an actively developed private-beta product. Authentication, saved projects, encrypted BYOK, Gemini execution, usage tracking, and the Response Lab foundation are implemented. Subscription billing and enterprise collaboration are not active.
 
-## Why Instruxa
+## What Instruxa does
 
-Prompts used in real products should not disappear into chat history. Instruxa is being designed to treat them as governed engineering assets: structured, versioned, evaluated, portable, and ready for collaboration.
+Instruxa treats prompts like production assets instead of disposable chat messages.
 
-## Available now
+```mermaid
+flowchart LR
+    A["Describe intent"] --> B["Compile prompt"]
+    B --> C["Run securely"]
+    C --> D["Compare models"]
+    D --> E["Evaluate quality"]
+    E --> F["Version and ship"]
+```
 
-- Interactive structured prompt compiler
-- Audience and response-style controls
-- Universal, OpenAI, Claude, and Gemini target selection
-- Developer and business quick-start templates
-- Deterministic requirements and output-contract generation
-- Prompt quality presentation and copy-ready export
-- Responsive, accessible premium interface
-- Cloudflare edge deployment
-- D1-backed accounts and private saved prompt projects
-- Automatic project-version snapshots
-- Dedicated static export for Cloudflare Pages
+The compiler turns a goal, audience, tone, and model target into a complete instruction contract containing a role, objective, constraints, output format, validation criteria, and quality bar.
 
-## Product vision
+## Product capabilities
 
-- Prompt projects, folders, tags, search, and version history
-- Live multi-provider generation and comparison
-- Encrypted bring-your-own-key support
-- Automated evaluations, regression suites, and quality gates
-- Team workspaces, roles, approvals, and audit trails
-- Metered credits and subscription entitlements
-- API, SDK, CLI, and CI/CD integration
+| Capability | Status |
+|---|---|
+| Structured prompt compiler | Available |
+| Premium responsive workspace | Available |
+| D1-backed accounts and secure sessions | Available |
+| Private projects and immutable version snapshots | Available |
+| OpenAI, Anthropic, and Gemini provider adapters | Available |
+| AES-256-GCM encrypted bring-your-own keys | Available |
+| Gemini Interactions API integration | Available |
+| Token, latency, credit, and status tracking | Available |
+| Automatic transient-provider retries | Available |
+| Safe Markdown response rendering and export | Available |
+| D1-backed Response Lab history | Migration 0003 |
+| Deterministic response quality evaluation | Migration 0003 |
+| Side-by-side connected-model comparison | Migration 0003 |
+| Streaming responses | Planned |
+| Teams, roles, approvals, and audit trails | Planned |
+| Paid subscriptions and live billing | Planned |
+
+## Response Lab
+
+The Response Lab is the next stage of the product workflow:
+
+- Persist successful runs to the authenticated user account
+- Record provider, model, access mode, tokens, latency, and timestamp
+- Score structure, completeness, actionability, and prompt-constraint fit
+- Compare responses from connected providers side by side
+- Reopen previous runs across sessions and devices
+- Keep provider credentials outside response history
+
+The first evaluator is intentionally deterministic and explainable. Model-assisted judges and reusable evaluation datasets remain roadmap items.
+
+## Security architecture
+
+- Passwords are salted and derived with PBKDF2-SHA-256 inside the Worker.
+- Session cookies are `HttpOnly`, `Secure`, `SameSite=Lax`, and backed by stored token digests.
+- Provider keys are encrypted using AES-256-GCM before D1 persistence.
+- The BYOK master key exists only as a Cloudflare Worker runtime secret.
+- Provider keys are decrypted only for an authenticated request inside the Worker.
+- All project, key, usage, and run-history queries are scoped to the authenticated user.
+- API responses containing private data use `Cache-Control: no-store`.
+- Provider overloads receive bounded retries with exponential backoff.
+- Real credentials and private prompts must never be committed to the repository.
+
+See [SECURITY.md](SECURITY.md) for reporting guidance and current limitations.
 
 ## Architecture
 
-    User intent
-        ↓
-    Structured compiler
-        ↓
-    Model-aware prompt contract
-        ↓
-    Quality checks → Copy / Export
-
-The current release runs entirely in the browser. The planned production architecture separates identity, prompt orchestration, model gateways, evaluation, usage metering, billing, and audit services. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Technology
+```mermaid
+flowchart TD
+    UI["React workspace"] --> API["Cloudflare Worker API"]
+    API --> AUTH["Session and ownership checks"]
+    API --> D1["Cloudflare D1"]
+    API --> VAULT["AES-GCM BYOK vault"]
+    VAULT --> GW["Provider gateway"]
+    GW --> MODELS["OpenAI · Anthropic · Gemini"]
+    GW --> RUNS["Usage and Response Lab records"]
+    RUNS --> D1
+```
 
 | Layer | Technology |
 |---|---|
-| Interface | React 19, TypeScript |
-| Application | Next.js-compatible App Router structure |
-| Styling | Tailwind CSS, shadcn/ui primitives |
-| Icons | Lucide React |
-| Runtime | Vinext / Cloudflare Workers |
-| Static distribution | Next.js static export |
+| Interface | React 19, TypeScript, Tailwind CSS |
+| Application structure | Next.js-compatible App Router |
+| Edge runtime | Vinext on Cloudflare Workers |
+| Persistence | Cloudflare D1 / SQLite |
+| AI providers | OpenAI Responses, Anthropic Messages, Gemini Interactions |
+| UI primitives | shadcn/ui, Lucide React |
 | Quality | ESLint, TypeScript, GitHub Actions |
+
+Detailed boundaries and data flows are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Local development
 
-Prerequisites: Node.js 22.13+ and npm.
+### Requirements
 
-    git clone https://github.com/veerendrakalyanbabu-VKB/Instruxa.git
-    cd Instruxa
-    npm ci
-    npm run dev
+- Node.js 22.13 or newer
+- npm
+- A Cloudflare account for Worker and D1 integration
 
-Validation:
+```bash
+git clone https://github.com/veerendrakalyanbabu-VKB/Instruxa.git
+cd Instruxa
+npm install
+npm run dev
+```
 
-    npm run lint
-    npm run build
-    npm run build:pages
+Quality checks:
 
-## Deployment
+```bash
+npm run lint
+npm run build
+npm test
+```
 
-### Cloudflare Workers
+## Cloudflare deployment
 
-The primary hosted MVP runs on Cloudflare Workers. Use the repository's validated Worker/Vinext build path.
+Create a D1 database named `instruxa` and bind it to the Worker as `DB`. Apply migrations in order:
 
-### Cloudflare Pages static export
+```bash
+npx wrangler d1 execute instruxa --remote --file=migrations/0001_accounts_projects.sql
+npx wrangler d1 execute instruxa --remote --file=migrations/0002_ai_gateway.sql
+npx wrangler d1 execute instruxa --remote --file=migrations/0003_response_lab.sql
+```
 
-- Build command: `npm run build:pages`
-- Output directory: `out`
-- Node.js: `22.13.0`
+Configure `BYOK_MASTER_KEY` as a Worker runtime secret. It must be valid Base64 that decodes to exactly 32 bytes. Optional platform-funded access uses:
 
-## Repository map
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `GEMINI_API_KEY`
 
-| Path | Purpose |
+Never add provider credentials or the master key as repository files or plaintext build variables.
+
+The connected Cloudflare build uses:
+
+| Setting | Value |
 |---|---|
-| `app/` | Product interface and global design system |
-| `components/ui/` | Reusable interface primitives |
-| `lib/` | Shared utilities |
-| `worker/` | Cloudflare runtime entry point |
-| `docs/` | Architecture and product roadmap |
-| `.github/workflows/` | Automated quality checks |
+| Production branch | `main` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | `/` |
 
-## Contributing and security
+## Repository structure
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Report vulnerabilities privately according to [SECURITY.md](SECURITY.md); do not publish sensitive reports in public issues.
+| Path | Responsibility |
+|---|---|
+| `app/` | Product surface and design system |
+| `components/` | Account, compiler, model runner, and UI components |
+| `worker/` | Authentication, project API, encrypted model gateway |
+| `migrations/` | Ordered D1 schema migrations |
+| `docs/` | Architecture and roadmap |
+| `tests/` | Behavioral and security-focused tests |
+| `.github/workflows/` | Continuous integration |
+
+## Engineering principles
+
+1. Fail closed for authentication and ownership checks.
+2. Keep credentials server-side and encrypted at rest.
+3. Make metering and commercial state authoritative on the server.
+4. Prefer explainable evaluation signals before opaque scoring.
+5. Preserve a deterministic, zero-provider-cost compiler path.
+6. Document implemented, partial, and planned capabilities honestly.
+7. Optimize for accessibility, performance, reduced motion, and mobile use.
+
+## Roadmap
+
+The next product milestones are streaming execution, richer evaluation datasets, response synthesis, team workspaces, governance, and subscription entitlements. See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Contributing
+
+Instruxa is currently owner-led. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Security reports must follow [SECURITY.md](SECURITY.md) and must not be posted publicly.
 
 ## Ownership
 
-Copyright 2026 K. Veerendra Kalyan Babu. All rights reserved. No license is granted for commercial reuse, redistribution, or derivative products without written permission.
-## Activate accounts on Cloudflare
+Copyright © 2026 K. Veerendra Kalyan Babu. All rights reserved.
 
-1. Create a D1 database named `instruxa`.
-2. Copy its database ID into the Cloudflare build variable `CLOUDFLARE_D1_DATABASE_ID`.
-3. Ensure the Worker D1 binding name is exactly `DB`.
-4. Apply the schema:
-
-    npx wrangler d1 execute instruxa --remote --file=migrations/0001_accounts_projects.sql
-
-5. Redeploy `main`, then verify `/api/health`, registration, sign-in, save, reopen, and delete.
-
-No provider keys or password secrets are stored in the repository.
-
-<!-- Cloudflare production build trigger: accounts milestone -->
+No license is granted for commercial reuse, redistribution, or derivative products without written permission.
