@@ -13,6 +13,7 @@ const defaults: Record<AiProvider,string> = {openai:"gpt-5-mini",anthropic:"clau
 type OpenAiResponse={output_text?:string;output?:Array<{content?:Array<{type?:string;text?:string}>}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
 type AnthropicResponse={content?:Array<{type?:string;text?:string}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
 type GeminiResponse={steps?:Array<{type?:string;content?:Array<{type?:string;text?:string}>}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
+type Evaluation={overall:number;structure:number;completeness:number;actionability:number;constraintFit:number;signals:string[]};
 const j=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const uid=()=>crypto.randomUUID();
 const providerOf=(value:unknown):AiProvider|null=>providers.includes(value as AiProvider)?value as AiProvider:null;
@@ -41,6 +42,20 @@ async function fetchWithRetry(url:string,init:RequestInit){
  }
  return response as Response;
 }
+
+function clamp(value:number){return Math.max(0,Math.min(100,Math.round(value)))}
+function evaluate(prompt:string,text:string):Evaluation{
+ const headings=(text.match(/^#{1,4}\s+/gm)||[]).length,bullets=(text.match(/^\s*[-*]\s+/gm)||[]).length,numbered=(text.match(/^\s*\d+[.)]\s+/gm)||[]).length;
+ const code=(text.match(/```/g)||[]).length>=2,tables=/^\|.+\|$/m.test(text),sections=["summary","architecture","implementation","security","test","risk"].filter(x=>text.toLowerCase().includes(x)).length;
+ const promptRules=(prompt.match(/^\s*[-*]\d.]\s+/gm)||[]).length,outputWords=text.trim().split(/\s+/).filter(Boolean).length;
+ const structure=clamp(38+headings*7+Math.min(18,(bullets+numbered)*2)+(tables?10:0)+(code?8:0));
+ const completeness=clamp(30+Math.min(35,outputWords/18)+sections*6);
+ const actionability=clamp(32+Math.min(28,(bullets+numbered)*3)+(code?16:0)+(\/\b(implement|configure|validate|deploy|test|create|use)\b/i.test(text)?14:0));
+ const constraintFit=clamp(48+Math.min(24,promptRules*3)+Math.min(24,sections*4)+(text.length>400?4:0));
+ const signals=[headings?`${headings} structured sections`:"Narrative response",bullets+numbered?`${bullets+numbered} actionable items`:"No explicit action list",code?"Implementation examples included":"No fenced implementation example",tables?"Comparison table included":"No comparison table"].slice(0,4);
+ return{overall:clamp((structure+completeness+actionability+constraintFit)/4),structure,completeness,actionability,constraintFit,signals};
+}
+function parseEvaluation(value:unknown){try{return JSON.parse(String(value||"{}")) as Evaluation}catch{return null}}
 
 async function callProvider(provider:AiProvider,model:string,prompt:string,key:string){
   if(provider==="openai"){
@@ -77,6 +92,17 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
   }
   const keyMatch=url.pathname.match(/^\/api\/ai\/keys\/(openai|anthropic|gemini)$/);
   if(keyMatch&&method==="DELETE"){await env.DB.prepare("DELETE FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,keyMatch[1]).run();return j({ok:true})}
+  if(url.pathname==="/api/ai/runs"&&method==="GET"){
+   try{
+    const rows=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,response_text AS text,input_tokens AS inputTokens,output_tokens AS outputTokens,latency_ms AS latencyMs,evaluation_json AS evaluation,created_at AS createdAt FROM ai_runs WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();
+    return j({runs:(rows.results as Array<Record<string,unknown>>).map(row=>({...row,evaluation:parseEvaluation(row.evaluation)})),migrationRequired:false});
+   }catch(error){if(String(error).includes("no such table"))return j({runs:[],migrationRequired:true});throw error}
+  }
+  const runMatch=url.pathname.match(/^\/api\/ai\/runs\/([0-9a-f-]+)$/i);
+  if(runMatch&&method==="DELETE"){
+   try{const result=await env.DB.prepare("DELETE FROM ai_runs WHERE id=? AND user_id=?").bind(runMatch[1],user.id).run();return result.meta.changes?j({ok:true}):j({error:"Run not found."},404)}
+   catch(error){if(String(error).includes("no such table"))return j({error:"Response Lab migration is not applied."},503);throw error}
+  }
   if(url.pathname==="/api/ai/usage"&&method==="GET"){
    const events=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,input_tokens AS inputTokens,output_tokens AS outputTokens,credits_used AS creditsUsed,status,created_at AS createdAt FROM usage_events WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();return j({events:events.results});
   }
@@ -93,7 +119,13 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
     const row=await env.DB.prepare("SELECT ciphertext,iv FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,provider).first<{ciphertext:string;iv:string}>();if(!row)return j({error:`Connect a ${provider} API key first.`},400);key=await decrypt(row.ciphertext,row.iv,env);
    }
    const eventId=uid(),started=Date.now();
-   try{const result=await callProvider(provider,model,prompt,key);await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,input_tokens,output_tokens,credits_used,status,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,result.inputTokens,result.outputTokens,charged?1:0,"succeeded",Date.now()-started).run();const credits=await env.DB.prepare("SELECT balance FROM credit_accounts WHERE user_id=?").bind(user.id).first<{balance:number}>();return j({id:eventId,...result,provider,model,mode,credits:credits?.balance??25});}
+   try{
+    const result=await callProvider(provider,model,prompt,key),latencyMs=Date.now()-started,evaluation=evaluate(prompt,result.text);
+    await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,input_tokens,output_tokens,credits_used,status,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,result.inputTokens,result.outputTokens,charged?1:0,"succeeded",latencyMs).run();
+    try{await env.DB.prepare("INSERT INTO ai_runs(id,user_id,provider,model,access_mode,prompt,response_text,input_tokens,output_tokens,latency_ms,evaluation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,prompt,result.text,result.inputTokens,result.outputTokens,latencyMs,JSON.stringify(evaluation)).run()}catch(historyError){if(!String(historyError).includes("no such table"))console.warn("Instruxa run history write failed",historyError)}
+    const credits=await env.DB.prepare("SELECT balance FROM credit_accounts WHERE user_id=?").bind(user.id).first<{balance:number}>();
+    return j({id:eventId,...result,provider,model,mode,credits:credits?.balance??25,latencyMs,evaluation});
+   }
    catch(error){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();const detail=error instanceof Error?error.message:"Provider request failed";await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed",detail.split(":").slice(0,2).join(":"),Date.now()-started).run();if(detail.startsWith("PROVIDER:")){const parts=detail.split(":");return j({error:parts.slice(2).join(":")||"Provider rejected the request."},Number(parts[1])||502)}throw error;}
   }
   return j({error:"Not found."},404);
