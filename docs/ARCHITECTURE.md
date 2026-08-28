@@ -40,6 +40,7 @@ Migrations are ordered and additive:
 1. `0001_accounts_projects.sql` — users, sessions, projects, project versions
 2. `0002_ai_gateway.sql` — provider keys, credit accounts, usage events
 3. `0003_response_lab.sql` — durable evaluated AI runs
+4. `0004_response_winners.sql` — persistent Response Lab winners
 
 Every private record carries a user ownership boundary directly or through a foreign key. API queries always include the authenticated user identifier.
 
@@ -68,7 +69,7 @@ Every private record carries a user ownership boundary directly or through a for
 | Anthropic | Messages API |
 | Gemini | Interactions API with `store: false` |
 
-Transient status codes `408`, `429`, `500`, `502`, `503`, and `504` receive bounded exponential-backoff retries. Non-transient provider errors are returned without retry amplification.
+Provider SSE events are normalized into an NDJSON stream consumed progressively by the workspace. Completed streams are accumulated, metered, evaluated, and persisted before the final event is emitted.\n\nTransient status codes `408`, `429`, `500`, `502`, `503`, and `504` receive bounded exponential-backoff retries. Non-transient provider errors are returned without retry amplification.
 
 ## Response evaluation
 
