@@ -1,0 +1,6 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS provider_keys (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,provider TEXT NOT NULL CHECK(provider IN ('openai','anthropic','gemini')),ciphertext TEXT NOT NULL,iv TEXT NOT NULL,key_last4 TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')),updated_at TEXT NOT NULL DEFAULT(datetime('now')),UNIQUE(user_id,provider));
+CREATE INDEX IF NOT EXISTS idx_provider_keys_owner ON provider_keys(user_id);
+CREATE TABLE IF NOT EXISTS credit_accounts (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,balance INTEGER NOT NULL DEFAULT 25 CHECK(balance>=0),updated_at TEXT NOT NULL DEFAULT(datetime('now')));
+CREATE TABLE IF NOT EXISTS usage_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,provider TEXT NOT NULL,model TEXT NOT NULL,access_mode TEXT NOT NULL CHECK(access_mode IN ('included','byok')),input_tokens INTEGER NOT NULL DEFAULT 0,output_tokens INTEGER NOT NULL DEFAULT 0,credits_used INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL CHECK(status IN ('succeeded','failed')),error_code TEXT,latency_ms INTEGER,created_at TEXT NOT NULL DEFAULT(datetime('now')));
+CREATE INDEX IF NOT EXISTS idx_usage_owner_created ON usage_events(user_id,created_at DESC);

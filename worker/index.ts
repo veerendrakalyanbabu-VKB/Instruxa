@@ -1,8 +1,9 @@
 /** Cloudflare Worker entry point with D1-backed accounts and prompt projects. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { handleAiApi, type AiEnv } from "./ai-gateway";
 
-interface Env {
+interface Env extends AiEnv {
   ASSETS: Fetcher;
   DB: D1Database;
   IMAGES: { input(stream: ReadableStream): { transform(options: Record<string, unknown>): { output(options: { format: string; quality: number }): Promise<{ response(): Response }> } } };
@@ -87,6 +88,7 @@ async function api(request: Request, env: Env) {
     }
     if (url.pathname === "/api/auth/session" && method === "GET") return json({ user: await currentUser(request, env) });
     const user = await currentUser(request, env); if (!user) return json({ error: "Authentication required." }, 401);
+    if (url.pathname.startsWith("/api/ai/")) return handleAiApi(request, env, user);
     if (url.pathname === "/api/projects" && method === "GET") {
       const result = await env.DB.prepare("SELECT id,title,goal,audience,tone,model,compiled_prompt AS compiledPrompt,created_at AS createdAt,updated_at AS updatedAt FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 100").bind(user.id).all();
       return json({ projects: result.results });
