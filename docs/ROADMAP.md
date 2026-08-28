@@ -38,11 +38,12 @@ This roadmap is directional. Implemented, active, and planned work are separated
 - Quality, latency, and token presentation
 - Safe Markdown rendering
 - Response export
+- Real provider response streaming
+- Persistent response winner selection
+- Best-response synthesis
 
 Remaining:
 
-- Streaming responses
-- Response winner selection and synthesis
 - Reusable evaluation datasets
 - Model-assisted judges
 - Regression tests and quality gates
