@@ -122,3 +122,5 @@ Copyright 2026 K. Veerendra Kalyan Babu. All rights reserved. No license is gran
 5. Redeploy `main`, then verify `/api/health`, registration, sign-in, save, reopen, and delete.
 
 No provider keys or password secrets are stored in the repository.
+
+<!-- Cloudflare production build trigger: accounts milestone -->
