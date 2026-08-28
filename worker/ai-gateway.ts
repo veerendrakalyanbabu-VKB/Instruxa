@@ -92,6 +92,10 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
   }
   const keyMatch=url.pathname.match(/^\/api\/ai\/keys\/(openai|anthropic|gemini)$/);
   if(keyMatch&&method==="DELETE"){await env.DB.prepare("DELETE FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,keyMatch[1]).run();return j({ok:true})}
+  if(url.pathname==="/api/ai/runs"&&method==="DELETE"){
+   try{await env.DB.prepare("DELETE FROM ai_runs WHERE user_id=?").bind(user.id).run();return j({ok:true})}
+   catch(error){if(String(error).includes("no such table"))return j({error:"Response Lab migration is not applied."},503);throw error}
+  }
   if(url.pathname==="/api/ai/runs"&&method==="GET"){
    try{
     const rows=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,response_text AS text,input_tokens AS inputTokens,output_tokens AS outputTokens,latency_ms AS latencyMs,evaluation_json AS evaluation,created_at AS createdAt FROM ai_runs WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();
