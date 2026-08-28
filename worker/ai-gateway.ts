@@ -9,10 +9,10 @@ export interface AiEnv {
 }
 
 const providers: AiProvider[] = ["openai", "anthropic", "gemini"];
-const defaults: Record<AiProvider,string> = {openai:"gpt-5-mini",anthropic:"claude-sonnet-5",gemini:"gemini-2.5-flash"};
+const defaults: Record<AiProvider,string> = {openai:"gpt-5-mini",anthropic:"claude-sonnet-5",gemini:"gemini-3.6-flash"};
 type OpenAiResponse={output_text?:string;output?:Array<{content?:Array<{type?:string;text?:string}>}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
 type AnthropicResponse={content?:Array<{type?:string;text?:string}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
-type GeminiResponse={candidates?:Array<{content?:{parts?:Array<{text?:string}>}}> ;usageMetadata?:{promptTokenCount?:number;candidatesTokenCount?:number};error?:{message?:string}};
+type GeminiResponse={steps?:Array<{type?:string;content?:Array<{type?:string;text?:string}>}>;usage?:{input_tokens?:number;output_tokens?:number};error?:{message?:string}};
 const j=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const uid=()=>crypto.randomUUID();
 const providerOf=(value:unknown):AiProvider|null=>providers.includes(value as AiProvider)?value as AiProvider:null;
@@ -41,9 +41,9 @@ async function callProvider(provider:AiProvider,model:string,prompt:string,key:s
     const data=await response.json() as AnthropicResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Anthropic request failed"}`);
     return{text:(data.content??[]).filter(x=>x.type==="text").map(x=>x.text).join("\n"),inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
   }
-  const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1800}})});
+  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":key,"content-type":"application/json"},body:JSON.stringify({model,input:prompt,store:false})});
   const data=await response.json() as GeminiResponse;if(!response.ok)throw new Error(`PROVIDER:${response.status}:${data?.error?.message||"Gemini request failed"}`);
-  return{text:(data.candidates?.[0]?.content?.parts??[]).map(x=>x.text??"").join("\n"),inputTokens:Number(data.usageMetadata?.promptTokenCount??0),outputTokens:Number(data.usageMetadata?.candidatesTokenCount??0)};
+  const text=(data.steps??[]).filter(x=>x.type==="model_output").flatMap(x=>x.content??[]).filter(x=>x.type==="text").map(x=>x.text??"").join("\n");\n  return{text,inputTokens:Number(data.usage?.input_tokens??0),outputTokens:Number(data.usage?.output_tokens??0)};
 }
 
 export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Promise<Response>{
