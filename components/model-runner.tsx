@@ -44,7 +44,7 @@ function Markdown({text}:{text:string}){
 
 export function ModelRunner({prompt}:{prompt:string}){
  const [config,setConfig]=useState<Config|null>(null),[provider,setProvider]=useState<Provider>("openai"),[mode,setMode]=useState<"byok"|"included">("byok"),[model,setModel]=useState("gpt-5-mini"),[apiKey,setApiKey]=useState(""),[output,setOutput]=useState(""),[usage,setUsage]=useState<Usage|null>(null),[history,setHistory]=useState<Run[]>([]),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[copied,setCopied]=useState(false);
- const load=useCallback(async()=>{try{const next=await call<Config>("/api/ai/config");setConfig(next)catch(e){const text=e instanceof Error?e.message:"Sign in to use the model gateway";if(!text.toLowerCase().includes("authentication"))setMessage(text)}},[]);
+ const load=useCallback(async()=>{try{const next=await call<Config>("/api/ai/config");setConfig(next)}catch(e){const text=e instanceof Error?e.message:"Sign in to use the model gateway";if(!text.toLowerCase().includes("authentication"))setMessage(text)}},[]);
  useEffect(()=>{void call<Config>("/api/ai/config").then(next=>{setConfig(next);setModel(next.defaults.openai)}).catch(e=>{const text=e instanceof Error?e.message:"Sign in to use the model gateway";if(!text.toLowerCase().includes("authentication"))setMessage(text)});try{const saved=localStorage.getItem(HISTORY_KEY);if(saved)setHistory(JSON.parse(saved).slice(0,5))}catch{}},[]);
  useEffect(()=>{const sync=()=>void load();window.addEventListener("instruxa-auth-changed",sync);return()=>window.removeEventListener("instruxa-auth-changed",sync)},[load]);
  const connected=useMemo(()=>config?.keys.find(x=>x.provider===provider),[config,provider]);
