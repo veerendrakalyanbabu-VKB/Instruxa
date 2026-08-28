@@ -46,3 +46,9 @@ The current release is intentionally simple and deterministic. It is a client-si
 ## Evolution
 
 The static MVP can remain the marketing and onboarding surface while authenticated product routes progressively move behind server-backed services. Each milestone must preserve the deterministic compiler as a no-cost fallback and test fixture.
+
+## Identity and project persistence
+
+Milestone 2 adds same-origin Worker API routes backed by Cloudflare D1. Passwords use PBKDF2-SHA-256 with unique random salts and 210,000 iterations. Browser sessions use random opaque tokens; only SHA-256 token digests are stored. Cookies are HttpOnly, Secure, SameSite=Lax, and expire after 30 days.
+
+Every project query is scoped to the authenticated user. Project updates create immutable version snapshots. Foreign keys cascade account and project cleanup. The production binding name is `DB`; the schema is versioned under `migrations/`.

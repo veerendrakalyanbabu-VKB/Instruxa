@@ -11,7 +11,7 @@
 
 Instruxa is a premium prompt-engineering workspace for developers, startups, and AI teams. It transforms rough intent into structured, reusable instructions with explicit roles, objectives, requirements, output contracts, and quality criteria.
 
-> **MVP status:** The public release is an interactive front-end MVP with a deterministic prompt compiler. Authentication, live model calls, persistent projects, billing, and team collaboration are planned and are not represented as production-ready today.
+> **Milestone 2 status:** The repository now includes D1-backed email/password accounts, secure cookie sessions, private saved projects, and automatic version snapshots. The production database must be provisioned and migrated before these account features are activated on the public Worker. Live model calls, billing, and teams remain planned.
 
 ## Why Instruxa
 
@@ -27,6 +27,8 @@ Prompts used in real products should not disappear into chat history. Instruxa i
 - Prompt quality presentation and copy-ready export
 - Responsive, accessible premium interface
 - Cloudflare edge deployment
+- D1-backed accounts and private saved prompt projects
+- Automatic project-version snapshots
 - Dedicated static export for Cloudflare Pages
 
 ## Product vision
@@ -108,3 +110,15 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Report vulnera
 ## Ownership
 
 Copyright 2026 K. Veerendra Kalyan Babu. All rights reserved. No license is granted for commercial reuse, redistribution, or derivative products without written permission.
+## Activate accounts on Cloudflare
+
+1. Create a D1 database named `instruxa`.
+2. Copy its database ID into the Cloudflare build variable `CLOUDFLARE_D1_DATABASE_ID`.
+3. Ensure the Worker D1 binding name is exactly `DB`.
+4. Apply the schema:
+
+    npx wrangler d1 execute instruxa --remote --file=migrations/0001_accounts_projects.sql
+
+5. Redeploy `main`, then verify `/api/health`, registration, sign-in, save, reopen, and delete.
+
+No provider keys or password secrets are stored in the repository.
