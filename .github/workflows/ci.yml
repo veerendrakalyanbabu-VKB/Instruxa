@@ -30,4 +30,13 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Validate production Worker build
-        run: npm run build
+        shell: bash
+        run: |
+          set +e
+          npm run build 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "${status}" -ne 0 ]; then
+            summary="$(tail -c 3500 build.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')"
+            echo "::error title=Production Worker build failed::${summary}"
+          fi
+          exit "${status}"
