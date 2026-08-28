@@ -14,7 +14,11 @@ command -v timeout || {
 
 vinext="${SITES_PROJECT_ROOT}/node_modules/.bin/vinext"
 if [[ ! -x "${vinext}" ]]; then
-  echo "vinext is unavailable. Run npm run install:ci and wait for it to finish before building." >&2
+  echo "Dependencies are unavailable; installing them for the clean build environment..."
+  npm install --no-audit --no-fund
+fi
+if [[ ! -x "${vinext}" ]]; then
+  echo "Dependency installation completed but vinext is still unavailable." >&2
   exit 69
 fi
 
