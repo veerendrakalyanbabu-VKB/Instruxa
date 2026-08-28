@@ -29,3 +29,11 @@
 @media(max-width:640px){.runner-output-head{flex-wrap:wrap}.runner-output-head small{order:4;width:100%;margin-left:0}.model-markdown{padding:18px;font-size:12px}}
 
 .model-sync{display:flex;align-items:center;gap:5px;color:#5f8f7c!important;font-size:9px!important;font-weight:500!important;letter-spacing:0!important}.model-sync:before{content:"";width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}
+
+.compare-button{display:flex;align-items:center;justify-content:center;gap:7px;height:42px;border:1px solid #22d3ee2b;border-radius:9px;background:#0891b20c;color:#a5f3fc;font-size:11px;font-weight:600;transition:.2s}.compare-button:hover:not(:disabled){border-color:#22d3ee55;background:#0891b218;transform:translateY(-1px)}.compare-button:disabled{cursor:not-allowed;opacity:.45}
+.quality-score{border:1px solid #34d3992b;border-radius:999px;background:#34d3990a;padding:4px 8px;color:#6ee7b7;font-size:9px;letter-spacing:.03em;white-space:nowrap}
+.comparison-lab{margin-top:28px;border-top:1px solid #ffffff0e;padding-top:28px}.comparison-title h3{margin-top:8px;font-size:24px;font-weight:550;letter-spacing:-.03em}.comparison-title p{margin-top:7px;color:#777784;font-size:11px}
+.comparison-grid{display:grid;gap:14px;margin-top:18px}.comparison-grid article{min-width:0;overflow:hidden;border:1px solid #ffffff10;border-radius:14px;background:#050508}.comparison-grid article>header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #ffffff0d;background:linear-gradient(120deg,#8b5cf60d,transparent)}
+.comparison-grid article>header div{display:grid;gap:3px}.comparison-grid article>header strong{font-size:13px}.comparison-grid article>header small{color:#696975;font-size:9px}.comparison-grid article>header>b{color:#6ee7b7;font-size:22px}.comparison-grid article>header>b span{color:#557064;font-size:9px}
+.comparison-metrics{display:flex;gap:14px;padding:9px 16px;border-bottom:1px solid #ffffff0a;color:#71717a;font-size:9px}.comparison-grid .model-markdown{max-height:480px}
+@media(min-width:980px){.comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.comparison-grid:has(article:nth-child(3)){grid-template-columns:repeat(3,minmax(0,1fr))}.comparison-grid:has(article:nth-child(3)) .model-markdown{font-size:11px;padding:16px}}
