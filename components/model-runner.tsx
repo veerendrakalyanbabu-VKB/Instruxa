@@ -53,7 +53,23 @@ export function ModelRunner({prompt}:{prompt:string}){
  function remember(run:Run){setHistory(current=>[run,...current.filter(x=>x.id!==run.id)].slice(0,50))}
  async function saveKey(){setBusy(true);setMessage("");try{await call("/api/ai/keys",{method:"POST",body:JSON.stringify({provider,apiKey})});setApiKey("");await load();setMessage(`${labels[provider]} key encrypted and connected.`)}catch(e){setMessage(e instanceof Error?e.message:"Key connection failed")}finally{setBusy(false)}}
  async function removeKey(){if(!confirm(`Remove your ${labels[provider]} key?`))return;setBusy(true);try{await call(`/api/ai/keys/${provider}`,{method:"DELETE"});await load();setMessage("Key removed.")}catch(e){setMessage(e instanceof Error?e.message:"Removal failed")}finally{setBusy(false)}}
- async function run(){setBusy(true);setMessage("");setOutput("");setUsage(null);setEvaluation(null);try{const result=await call<{id:string;text:string;inputTokens:number;outputTokens:number;credits:number;latencyMs:number;evaluation:Evaluation}>("/api/ai/generate",{method:"POST",body:JSON.stringify({provider,model,mode,prompt})});const nextUsage={inputTokens:result.inputTokens,outputTokens:result.outputTokens};setOutput(result.text);setUsage(nextUsage);setEvaluation(result.evaluation);remember({id:result.id,provider,model,text:result.text,usage:nextUsage,latencyMs:result.latencyMs,evaluation:result.evaluation,createdAt:new Date().toISOString()});if(config)setConfig({...config,credits:result.credits});setMessage("Model response completed securely.")}catch(e){setMessage(e instanceof Error?e.message:"Generation failed")}finally{setBusy(false)}}
+ async function run(){
+  setBusy(true);setMessage("");setOutput("");setUsage(null);setEvaluation(null);
+  try{
+   const response=await fetch("/api/ai/generate-stream",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({provider,model,mode,prompt})});
+   if(!response.ok){const failure=await response.json() as {error?:string};throw new Error(failure.error||"Generation failed")}
+   if(!response.body)throw new Error("Streaming is unavailable in this browser.");
+   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="",finalText="",completed=false;
+   while(true){const chunk=await reader.read();if(chunk.done)break;buffer+=decoder.decode(chunk.value,{stream:true});const lines=buffer.split("\n");buffer=lines.pop()||"";
+    for(const line of lines){if(!line.trim())continue;const event=JSON.parse(line) as {type:string;text?:string;error?:string;id?:string;inputTokens?:number;outputTokens?:number;credits?:number;latencyMs?:number;evaluation?:Evaluation};
+     if(event.type==="delta"&&event.text){finalText+=event.text;setOutput(finalText)}
+     if(event.type==="error")throw new Error(event.error||"Provider stream failed")
+     if(event.type==="done"&&event.id&&event.evaluation){const nextUsage={inputTokens:event.inputTokens||0,outputTokens:event.outputTokens||0};setUsage(nextUsage);setEvaluation(event.evaluation);remember({id:event.id,provider,model,text:finalText,usage:nextUsage,latencyMs:event.latencyMs,evaluation:event.evaluation,createdAt:new Date().toISOString()});if(config&&typeof event.credits==="number")setConfig({...config,credits:event.credits});completed=true}
+    }
+   }
+   if(!completed)throw new Error("The provider stream ended before completion.");setMessage("Stream completed and saved securely.");void loadRuns()
+  }catch(e){setMessage(e instanceof Error?e.message:"Generation failed")}finally{setBusy(false)}
+ }
  async function copyOutput(){await navigator.clipboard.writeText(output);setCopied(true);setTimeout(()=>setCopied(false),1400)}
  function download(){const blob=new Blob([output],{type:"text/markdown;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`instruxa-${provider}-response.md`;a.click();URL.revokeObjectURL(url)}
  function openRun(item:Run){setProvider(item.provider);setModel(item.model);setOutput(item.text);setUsage(item.usage||{inputTokens:item.inputTokens||0,outputTokens:item.outputTokens||0});setEvaluation(item.evaluation||null);setMessage(`Viewing ${labels[item.provider]} run from ${new Date(item.createdAt).toLocaleString()}.`)}
