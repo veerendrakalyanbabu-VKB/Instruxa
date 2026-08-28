@@ -1,56 +1,81 @@
 # Product Roadmap
 
-This roadmap is directional. Dates and commercial commitments are intentionally excluded until milestones are validated.
+This roadmap is directional. Implemented, active, and planned work are separated to avoid overstating product readiness.
 
-## M0 — Public MVP (complete)
+## M0 — Prompt compiler · Complete
 
 - Premium responsive interface
-- Deterministic prompt compiler
-- Model targeting and quick starts
-- Copy-ready output
-- Cloudflare deployment
-- Public engineering repository
+- Deterministic structured prompt compiler
+- Audience, tone, and model targeting
+- Quick-start templates
+- Markdown copy and export
+- Cloudflare Worker deployment
 
-## M1 — Product foundation
+## M1 — Account cloud · Complete
 
-- Authentication and secure sessions
-- Personal dashboard
-- Prompt projects, folders, tags, and search
-- Create, edit, duplicate, archive, and restore
-- Prompt version history
+- D1-backed registration and sign-in
+- Secure opaque cookie sessions
+- Private prompt projects
+- Immutable project-version snapshots
+- User-scoped project APIs
 
-## M2 — Live AI engine
+## M2 — Secure model gateway · Complete
 
-- OpenAI, Anthropic, and Gemini provider adapters
-- Improve, expand, shorten, debug, and convert actions
-- Structured JSON and Markdown exports
-- Encrypted BYOK vault
-- Provider cost and rate limits
+- OpenAI Responses adapter
+- Anthropic Messages adapter
+- Gemini Interactions adapter
+- AES-256-GCM encrypted BYOK storage
+- Provider-aware model selection
+- Included-credit foundation
+- Token, latency, and status metering
+- Automatic bounded retries
 
-## M3 — Evaluation and PromptOps
+## M3 — Response Lab · Active
 
-- Reusable test cases and datasets
-- Side-by-side model comparison
-- Deterministic and model-assisted evaluators
-- Regression detection
-- Draft, review, approve, and production stages
+- D1-backed run history
+- Deterministic response evaluation
+- Side-by-side connected-model comparison
+- Quality, latency, and token presentation
+- Safe Markdown rendering
+- Response export
 
-## M4 — Teams and governance
+Remaining:
+
+- Streaming responses
+- Response winner selection and synthesis
+- Reusable evaluation datasets
+- Model-assisted judges
+- Regression tests and quality gates
+- Prompt-to-run traceability by project and version
+
+## M4 — Teams and governance · Planned
 
 - Organization workspaces
 - Invitations and role-based access
-- Comments, review requests, and approvals
-- Audit history and retention controls
 - Shared prompt registry
+- Comments and review requests
+- Approval and promotion workflows
+- Audit events and retention controls
 
-## M5 — Commercial launch
+## M5 — Commercial launch · Planned
 
-- Free, Pro, Team, and Enterprise entitlements
-- Included-credit metering
-- Monthly and annual subscriptions
-- Invoice, cancellation, and webhook lifecycle
-- Abuse controls, analytics, and support operations
+- Server-authoritative plan entitlements
+- Free, Pro, Team, and Enterprise limits
+- Subscription checkout and customer portal
+- Signed, idempotent billing webhooks
+- Credit purchases and provider-cost controls
+- Abuse monitoring and operational analytics
 
-## Launch criteria
+## Public paid-launch gates
 
-A paid public launch requires verified authentication, tenant isolation, encrypted secret storage, usage metering, billing idempotency, automated tests, monitoring, privacy and legal documents, and a successful private beta.
+A paid launch requires:
+
+- Email verification and account recovery
+- CSRF review and session revocation controls
+- Tenant-isolation tests
+- Key-rotation and incident procedures
+- Billing idempotency and reconciliation
+- Automated migration verification
+- Monitoring and alerting
+- Privacy policy, terms, and data-retention policy
+- Private-beta load and security testing
