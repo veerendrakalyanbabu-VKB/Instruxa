@@ -95,13 +95,37 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
   if(url.pathname==="/api/ai/runs"&&method==="GET"){
    try{
     const rows=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,response_text AS text,input_tokens AS inputTokens,output_tokens AS outputTokens,latency_ms AS latencyMs,evaluation_json AS evaluation,created_at AS createdAt FROM ai_runs WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();
-    return j({runs:(rows.results as Array<Record<string,unknown>>).map(row=>({...row,evaluation:parseEvaluation(row.evaluation)})),migrationRequired:false});
+    let winnerIds=new Set<string>();try{const winners=await env.DB.prepare("SELECT run_id FROM response_winners WHERE user_id=?").bind(user.id).all();winnerIds=new Set((winners.results as Array<{run_id:string}>).map(x=>x.run_id))}catch{}
+    return j({runs:(rows.results as Array<Record<string,unknown>>).map(row=>({...row,evaluation:parseEvaluation(row.evaluation),isWinner:winnerIds.has(String(row.id))})),migrationRequired:false});
    }catch(error){if(String(error).includes("no such table"))return j({runs:[],migrationRequired:true});throw error}
   }
   const runMatch=url.pathname.match(/^\/api\/ai\/runs\/([0-9a-f-]+)$/i);
   if(runMatch&&method==="DELETE"){
    try{const result=await env.DB.prepare("DELETE FROM ai_runs WHERE id=? AND user_id=?").bind(runMatch[1],user.id).run();return result.meta.changes?j({ok:true}):j({error:"Run not found."},404)}
    catch(error){if(String(error).includes("no such table"))return j({error:"Response Lab migration is not applied."},503);throw error}
+  }
+  const winnerMatch=url.pathname.match(/^\/api\/ai\/runs\/([0-9a-f-]+)\/winner$/i);
+  if(winnerMatch&&method==="POST"){
+   const owned=await env.DB.prepare("SELECT id FROM ai_runs WHERE id=? AND user_id=?").bind(winnerMatch[1],user.id).first();if(!owned)return j({error:"Run not found."},404);
+   try{await env.DB.prepare("INSERT OR IGNORE INTO response_winners(id,user_id,run_id) VALUES(?,?,?)").bind(uid(),user.id,winnerMatch[1]).run();return j({ok:true,runId:winnerMatch[1]})}
+   catch(error){if(String(error).includes("no such table"))return j({error:"Apply migration 0004_response_winners.sql first."},503);throw error}
+  }
+  if(url.pathname==="/api/ai/synthesize"&&method==="POST"){
+   const input=await request.json() as Record<string,unknown>,runIds=Array.isArray(input.runIds)?[...new Set(input.runIds.map(String))].slice(0,3):[],provider=providerOf(input.provider);
+   if(!provider||runIds.length<2)return j({error:"Select at least two responses and a synthesis provider."},400);
+   const placeholders=runIds.map(()=>"?").join(","),rows=await env.DB.prepare(`SELECT id,provider,model,response_text FROM ai_runs WHERE user_id=? AND id IN (${placeholders})`).bind(user.id,...runIds).all();
+   if(rows.results.length!==runIds.length)return j({error:"One or more selected responses are unavailable."},404);
+   const keyRow=await env.DB.prepare("SELECT ciphertext,iv FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,provider).first<{ciphertext:string;iv:string}>();if(!keyRow)return j({error:`Connect a ${provider} API key before synthesizing.`},400);
+   const key=await decrypt(keyRow.ciphertext,keyRow.iv,env),model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider];
+   const sources=(rows.results as Array<{provider:string;model:string;response_text:string}>).map((row,index)=>`## Candidate ${index+1} — ${row.provider} / ${row.model}\n${row.response_text.slice(0,9000)}`).join("\n\n---\n\n");
+   const synthesisPrompt=`You are Instruxa's response synthesis engine. Produce one superior final answer from the candidate responses below. Preserve correct details, resolve conflicts explicitly, remove duplication, improve structure and actionability, and never invent facts. Return only the consolidated answer in clean Markdown.\n\n${sources}`;
+   const eventId=uid(),started=Date.now();
+   try{
+    const result=await callProvider(provider,model,synthesisPrompt,key),latencyMs=Date.now()-started,evaluation=evaluate(synthesisPrompt,result.text);
+    await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,input_tokens,output_tokens,credits_used,status,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,"byok",result.inputTokens,result.outputTokens,0,"succeeded",latencyMs).run();
+    await env.DB.prepare("INSERT INTO ai_runs(id,user_id,provider,model,access_mode,prompt,response_text,input_tokens,output_tokens,latency_ms,evaluation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,"byok",synthesisPrompt,result.text,result.inputTokens,result.outputTokens,latencyMs,JSON.stringify(evaluation)).run();
+    return j({id:eventId,...result,provider,model,latencyMs,evaluation,sourceRunIds:runIds});
+   }catch(error){const detail=error instanceof Error?error.message:"Synthesis failed";await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,"byok",0,"failed",detail.split(":").slice(0,2).join(":"),Date.now()-started).run();if(detail.startsWith("PROVIDER:")){const parts=detail.split(":");return j({error:parts.slice(2).join(":")},Number(parts[1])||502)}throw error}
   }
   if(url.pathname==="/api/ai/usage"&&method==="GET"){
    const events=await env.DB.prepare("SELECT id,provider,model,access_mode AS accessMode,input_tokens AS inputTokens,output_tokens AS outputTokens,credits_used AS creditsUsed,status,created_at AS createdAt FROM usage_events WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();return j({events:events.results});
