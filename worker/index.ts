@@ -19,7 +19,7 @@ const normalizeEmail = (value: unknown) => String(value ?? "").trim().toLowerCas
 
 async function passwordHash(password: string, salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(salt), iterations: 210_000 }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(salt), iterations: 100_000 }, key, 256);
   return `${salt}:${bytesToHex(new Uint8Array(bits))}`;
 }
 async function passwordMatches(password: string, stored: string) {
@@ -62,8 +62,15 @@ async function api(request: Request, env: Env) {
       const input = await body(request); const email = normalizeEmail(input.email); const name = String(input.name ?? "").trim().slice(0, 80); const password = String(input.password ?? "");
       if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 10) return json({ error: "Use a valid name, email, and password of at least 10 characters." }, 400);
       const userId = id();
-      try { await env.DB.prepare("INSERT INTO users (id,name,email,password_hash) VALUES (?,?,?,?)").bind(userId, name, email, await passwordHash(password)).run(); }
-      catch { return json({ error: "An account with this email already exists." }, 409); }
+      try {
+        const hash = await passwordHash(password);
+        await env.DB.prepare("INSERT INTO users (id,name,email,password_hash) VALUES (?,?,?,?)").bind(userId, name, email, hash).run();
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("Instruxa registration failure", detail);
+        if (detail.toLowerCase().includes("unique")) return json({ error: "An account with this email already exists." }, 409);
+        return json({ error: "Account creation failed securely. Please try again." }, 500);
+      }
       const session = await createSession(userId, env);
       return json({ user: { id: userId, name, email } }, 201, { "set-cookie": session.header });
     }
