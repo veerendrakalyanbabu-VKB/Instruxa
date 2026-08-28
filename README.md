@@ -58,7 +58,9 @@ The compiler turns a goal, audience, tone, and model target into a complete inst
 | D1-backed Response Lab history | Migration 0003 |
 | Deterministic response quality evaluation | Migration 0003 |
 | Side-by-side connected-model comparison | Migration 0003 |
-| Streaming responses | Planned |
+| Real normalized provider streaming | Available |
+| Persistent winner selection | Migration 0004 |
+| Best-response synthesis | Available after comparison |
 | Teams, roles, approvals, and audit trails | Planned |
 | Paid subscriptions and live billing | Planned |
 
@@ -146,6 +148,7 @@ Create a D1 database named `instruxa` and bind it to the Worker as `DB`. Apply m
 npx wrangler d1 execute instruxa --remote --file=migrations/0001_accounts_projects.sql
 npx wrangler d1 execute instruxa --remote --file=migrations/0002_ai_gateway.sql
 npx wrangler d1 execute instruxa --remote --file=migrations/0003_response_lab.sql
+npx wrangler d1 execute instruxa --remote --file=migrations/0004_response_winners.sql
 ```
 
 Configure `BYOK_MASTER_KEY` as a Worker runtime secret. It must be valid Base64 that decodes to exactly 32 bytes. Optional platform-funded access uses:
@@ -189,7 +192,7 @@ The connected Cloudflare build uses:
 
 ## Roadmap
 
-The next product milestones are streaming execution, richer evaluation datasets, response synthesis, team workspaces, governance, and subscription entitlements. See [docs/ROADMAP.md](docs/ROADMAP.md).
+The next product milestones are richer evaluation datasets, project-linked experiments, team workspaces, governance, and subscription entitlements. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 
