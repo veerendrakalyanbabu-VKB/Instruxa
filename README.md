@@ -61,6 +61,7 @@ The compiler turns a goal, audience, tone, and model target into a complete inst
 | Real normalized provider streaming | Available |
 | Persistent winner selection | Migration 0004 |
 | Best-response synthesis | Available after comparison |
+| Usage and intelligence dashboard | Available |
 | Teams, roles, approvals, and audit trails | Planned |
 | Paid subscriptions and live billing | Planned |
 
@@ -76,6 +77,19 @@ The Response Lab is the next stage of the product workflow:
 - Keep provider credentials outside response history
 
 The first evaluator is intentionally deterministic and explainable. Model-assisted judges and reusable evaluation datasets remain roadmap items.
+
+## Usage and intelligence
+
+The authenticated dashboard aggregates private D1 telemetry across selectable 7, 30, and 90-day windows:
+
+- Runs, success rate, failures, tokens, and average latency
+- BYOK versus included-credit activity
+- Provider distribution and model usage
+- Explainable quality trajectory
+- Included-credit balance
+- Response Lab winner leaderboard
+
+Analytics queries are evaluated server-side and scoped to the authenticated account.
 
 ## Security architecture
 
