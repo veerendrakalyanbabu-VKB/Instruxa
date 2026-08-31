@@ -32,6 +32,7 @@ sequenceDiagram
 | BYOK vault | AES-256-GCM encryption and request-scoped decryption |
 | Provider gateway | OpenAI, Anthropic, Gemini adapters, retries, normalized output |
 | Response Lab | Durable run retrieval, deterministic evaluation, model comparison |
+| Intelligence dashboard | User-scoped aggregation of usage, quality, latency, access mode, and winners |
 
 ## Data model
 
@@ -86,6 +87,10 @@ Signals come from observable response features such as headings, action lists, i
 ## Credit and usage flow
 
 Included access performs an atomic balance decrement before execution. A failed provider call refunds the credit. BYOK calls record usage without deducting included credits. Usage events record provider, model, mode, tokens, latency, status, and bounded error classification.
+
+## Analytics
+
+`GET /api/ai/analytics` accepts a bounded 7, 30, or 90-day window. D1 aggregates usage and provider metrics using authenticated user ownership. Quality and winner signals are derived from that user's Response Lab records. No cross-account totals are exposed.
 
 ## Reliability and privacy
 
