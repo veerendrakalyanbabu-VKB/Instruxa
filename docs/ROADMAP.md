@@ -41,6 +41,8 @@ This roadmap is directional. Implemented, active, and planned work are separated
 - Real provider response streaming
 - Persistent response winner selection
 - Best-response synthesis
+- Authenticated usage and intelligence dashboard
+- Provider, model, token, latency, quality, and winner analytics
 
 Remaining:
 
