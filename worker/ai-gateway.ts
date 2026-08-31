@@ -47,10 +47,10 @@ function clamp(value:number){return Math.max(0,Math.min(100,Math.round(value)))}
 function evaluate(prompt:string,text:string):Evaluation{
  const headings=(text.match(/^#{1,4}\s+/gm)||[]).length,bullets=(text.match(/^\s*[-*]\s+/gm)||[]).length,numbered=(text.match(/^\s*\d+[.)]\s+/gm)||[]).length;
  const code=(text.match(/```/g)||[]).length>=2,tables=/^\|.+\|$/m.test(text),sections=["summary","architecture","implementation","security","test","risk"].filter(x=>text.toLowerCase().includes(x)).length;
- const promptRules=(prompt.match(/^\s*[-*]\d.]\s+/gm)||[]).length,outputWords=text.trim().split(/\s+/).filter(Boolean).length;
+ const promptRules=(prompt.match(/^\s*(?:[-*]|\d+[.)])\s+/gm)||[]).length,outputWords=text.trim().split(/\s+/).filter(Boolean).length;
  const structure=clamp(38+headings*7+Math.min(18,(bullets+numbered)*2)+(tables?10:0)+(code?8:0));
  const completeness=clamp(30+Math.min(35,outputWords/18)+sections*6);
- const actionability=clamp(32+Math.min(28,(bullets+numbered)*3)+(code?16:0)+(\/\b(implement|configure|validate|deploy|test|create|use)\b/i.test(text)?14:0));
+ const actionability=clamp(32+Math.min(28,(bullets+numbered)*3)+(code?16:0)+(/\b(implement|configure|validate|deploy|test|create|use)\b/i.test(text)?14:0));
  const constraintFit=clamp(48+Math.min(24,promptRules*3)+Math.min(24,sections*4)+(text.length>400?4:0));
  const signals=[headings?`${headings} structured sections`:"Narrative response",bullets+numbered?`${bullets+numbered} actionable items`:"No explicit action list",code?"Implementation examples included":"No fenced implementation example",tables?"Comparison table included":"No comparison table"].slice(0,4);
  return{overall:clamp((structure+completeness+actionability+constraintFit)/4),structure,completeness,actionability,constraintFit,signals};
