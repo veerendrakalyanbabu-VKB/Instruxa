@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleAiApi, type AiEnv } from "./ai-gateway";
+import { accountEntitlements, handleBillingApi, handleBillingWebhook } from "./billing";
 
 interface Env extends AiEnv {
   ASSETS: Fetcher;
@@ -59,6 +60,7 @@ async function api(request: Request, env: Env) {
   const method = request.method;
   try {
     if (url.pathname === "/api/health") return json({ ok: true, service: "instruxa", database: "d1" });
+    if (url.pathname === "/api/billing/webhook" && method === "POST") return handleBillingWebhook(request, env);
     if (url.pathname === "/api/auth/register" && method === "POST") {
       const input = await body(request); const email = normalizeEmail(input.email); const name = String(input.name ?? "").trim().slice(0, 80); const password = String(input.password ?? "");
       if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 10) return json({ error: "Use a valid name, email, and password of at least 10 characters." }, 400);
@@ -89,12 +91,17 @@ async function api(request: Request, env: Env) {
     if (url.pathname === "/api/auth/session" && method === "GET") return json({ user: await currentUser(request, env) });
     const user = await currentUser(request, env); if (!user) return json({ error: "Authentication required." }, 401);
     if (url.pathname.startsWith("/api/ai/")) return handleAiApi(request, env, user);
+    if (url.pathname.startsWith("/api/billing")) return handleBillingApi(request, env, user);
     if (url.pathname === "/api/projects" && method === "GET") {
       const result = await env.DB.prepare("SELECT id,title,goal,audience,tone,model,compiled_prompt AS compiledPrompt,created_at AS createdAt,updated_at AS updatedAt FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 100").bind(user.id).all();
       return json({ projects: result.results });
     }
     if (url.pathname === "/api/projects" && method === "POST") {
-      const data = projectFields(await body(request)); if (!data.goal) return json({ error: "A project goal is required." }, 400); const projectId = id();
+      const data = projectFields(await body(request)); if (!data.goal) return json({ error: "A project goal is required." }, 400);
+      const entitlements = await accountEntitlements(env, user.id);
+      const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM projects WHERE user_id=?").bind(user.id).first<{count:number}>();
+      if ((count?.count ?? 0) >= entitlements.maxProjects) return json({ error: `${entitlements.name} supports ${entitlements.maxProjects} private projects. Upgrade to create another project.` }, 403);
+      const projectId = id();
       await env.DB.prepare("INSERT INTO projects (id,user_id,title,goal,audience,tone,model,compiled_prompt) VALUES (?,?,?,?,?,?,?,?)").bind(projectId,user.id,data.title,data.goal,data.audience,data.tone,data.model,data.compiled_prompt).run();
       await env.DB.prepare("INSERT INTO project_versions (id,project_id,user_id,version_number,payload) VALUES (?,?,?,?,?)").bind(id(),projectId,user.id,1,JSON.stringify(data)).run();
       return json({ project: { id: projectId, ...data } }, 201);

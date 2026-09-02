@@ -60,13 +60,23 @@ Remaining:
 - Approval and promotion workflows
 - Audit events and retention controls
 
-## M5 — Commercial launch · Planned
+## M5 — Commercial launch · Active
 
-- Server-authoritative plan entitlements
-- Free, Pro, Team, and Enterprise limits
-- Subscription checkout and customer portal
-- Signed, idempotent billing webhooks
-- Credit purchases and provider-cost controls
+- Server-authoritative Free, Pro, and Team entitlements
+- Plan-aware project and generation-rate limits
+- Stripe subscription checkout and customer portal
+- Signed, replay-bounded, idempotent billing webhooks
+- One-time credit-pack checkout
+- Immutable credit ledger and failed-run refunds
+
+Remaining:
+
+- Apply migration 0005 to production
+- Configure Stripe products and Worker runtime secrets
+- Complete Stripe test-mode checkout, renewal, cancellation, and refund verification
+- Reconciliation and operator tooling
+- Abuse monitoring and provider-cost guardrails
+- Enterprise contracting and custom entitlements
 - Abuse monitoring and operational analytics
 
 ## Public paid-launch gates

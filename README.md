@@ -63,7 +63,8 @@ The compiler turns a goal, audience, tone, and model target into a complete inst
 | Best-response synthesis | Available after comparison |
 | Usage and intelligence dashboard | Available |
 | Teams, roles, approvals, and audit trails | Planned |
-| Paid subscriptions and live billing | Planned |
+| Plan entitlements and credit ledger | Migration 0005 |
+| Stripe checkout, portal, and signed webhooks | Ready for operator configuration |
 
 ## Response Lab
 
@@ -91,6 +92,21 @@ The authenticated dashboard aggregates private D1 telemetry across selectable 7,
 
 Analytics queries are evaluated server-side and scoped to the authenticated account.
 
+## Monetization foundation
+
+Instruxa has a server-authoritative commercial layer rather than trusting prices or balances from the browser:
+
+- Free, Pro, and Team entitlement policies
+- Per-plan project and generation-rate enforcement
+- Stripe Checkout for subscriptions and credit packs
+- Stripe Billing Portal sessions for customer self-service
+- Signed webhook verification with a five-minute replay window
+- Idempotent subscription grants, renewals, and credit purchases
+- Immutable user-scoped credit ledger
+- Automatic included-credit refund records for failed AI executions
+
+The code is production-oriented, but live charges remain disabled until the operator applies migration 0005 and configures Stripe products, webhook signing, and runtime secrets.
+
 ## Security architecture
 
 - Passwords are salted and derived with PBKDF2-SHA-256 inside the Worker.
@@ -113,10 +129,12 @@ flowchart TD
     API --> AUTH["Session and ownership checks"]
     API --> D1["Cloudflare D1"]
     API --> VAULT["AES-GCM BYOK vault"]
+    API --> BILLING["Plans and Stripe billing"]
     VAULT --> GW["Provider gateway"]
     GW --> MODELS["OpenAI · Anthropic · Gemini"]
     GW --> RUNS["Usage and Response Lab records"]
     RUNS --> D1
+    BILLING --> D1
 ```
 
 | Layer | Technology |
@@ -163,6 +181,7 @@ npx wrangler d1 execute instruxa --remote --file=migrations/0001_accounts_projec
 npx wrangler d1 execute instruxa --remote --file=migrations/0002_ai_gateway.sql
 npx wrangler d1 execute instruxa --remote --file=migrations/0003_response_lab.sql
 npx wrangler d1 execute instruxa --remote --file=migrations/0004_response_winners.sql
+npx wrangler d1 execute instruxa --remote --file=migrations/0005_monetization.sql
 ```
 
 Configure `BYOK_MASTER_KEY` as a Worker runtime secret. It must be valid Base64 that decodes to exactly 32 bytes. Optional platform-funded access uses:
@@ -172,6 +191,16 @@ Configure `BYOK_MASTER_KEY` as a Worker runtime secret. It must be valid Base64 
 - `GEMINI_API_KEY`
 
 Never add provider credentials or the master key as repository files or plaintext build variables.
+
+Stripe billing is optional and fail-closed. Configure these as Worker runtime secrets or variables only when the Stripe products exist:
+
+- `STRIPE_SECRET_KEY` — secret key
+- `STRIPE_WEBHOOK_SECRET` — signing secret for `POST /api/billing/webhook`
+- `STRIPE_PRICE_PRO` and `STRIPE_PRICE_TEAM` — recurring Price IDs
+- `STRIPE_PRICE_CREDITS_100`, `STRIPE_PRICE_CREDITS_500`, and `STRIPE_PRICE_CREDITS_2000` — one-time Price IDs
+- `APP_URL` — canonical HTTPS production origin used for checkout returns
+
+Do not enable checkout until webhook delivery has been tested in Stripe test mode.
 
 The connected Cloudflare build uses:
 
@@ -187,8 +216,8 @@ The connected Cloudflare build uses:
 | Path | Responsibility |
 |---|---|
 | `app/` | Product surface and design system |
-| `components/` | Account, compiler, model runner, and UI components |
-| `worker/` | Authentication, project API, encrypted model gateway |
+| `components/` | Account, compiler, model runner, analytics, and billing surfaces |
+| `worker/` | Authentication, projects, encrypted model gateway, billing orchestration |
 | `migrations/` | Ordered D1 schema migrations |
 | `docs/` | Architecture and roadmap |
 | `tests/` | Behavioral and security-focused tests |
@@ -206,7 +235,7 @@ The connected Cloudflare build uses:
 
 ## Roadmap
 
-The next product milestones are richer evaluation datasets, project-linked experiments, team workspaces, governance, and subscription entitlements. See [docs/ROADMAP.md](docs/ROADMAP.md).
+The next product milestones are Stripe test-mode activation, richer evaluation datasets, project-linked experiments, team workspaces, and governance. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 

@@ -31,12 +31,16 @@ Never include real API keys, passwords, session cookies, private prompts, custom
 - Per-user generation rate limiting
 - Bounded retries for transient provider failures
 - Failed-call included-credit refunds
+- Server-authoritative plan and credit enforcement
+- Stripe HMAC-SHA256 webhook verification with replay bounds
+- Idempotent billing-event and credit-grant references
+- No raw payment payload or card-data persistence
 - `Cache-Control: no-store` on private JSON APIs
 - Secrets excluded by `.gitignore`
 
 ## Current limitations
 
-The private beta does not yet include email verification, password recovery, multi-factor authentication, organization RBAC, formal audit retention, automated key rotation, subscription billing, or an external penetration test. The deterministic evaluator is not a factual-accuracy guarantee.
+The private beta does not yet include email verification, password recovery, multi-factor authentication, organization RBAC, formal audit retention, automated key rotation, activated live subscription billing, or an external penetration test. The deterministic evaluator is not a factual-accuracy guarantee.
 
 ## Operator responsibilities
 
@@ -46,6 +50,8 @@ The private beta does not yet include email verification, password recovery, mul
 - Rotate secrets after suspected exposure.
 - Never paste production secrets into issues, commits, screenshots, or build logs.
 - Review provider data-processing settings before enabling platform-funded keys.
+- Test Stripe checkout and signed webhook fulfillment in test mode before enabling live Price IDs.
+- Reconcile Stripe invoices, subscriptions, and D1 credit grants before commercial launch.
 
 ## Response process
 

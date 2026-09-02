@@ -1,6 +1,7 @@
+import { accountEntitlements, consumeIncludedCredit, refundIncludedCredit, type BillingEnv } from "./billing";
 export type AiProvider = "openai" | "anthropic" | "gemini";
 export type GatewayUser = { id: string; name: string; email: string };
-export interface AiEnv {
+export interface AiEnv extends BillingEnv {
   DB: D1Database;
   BYOK_MASTER_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -170,12 +171,12 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
   if(url.pathname==="/api/ai/generate-stream"&&method==="POST"){
    const input=await request.json() as Record<string,unknown>,provider=providerOf(input.provider),prompt=String(input.prompt??"").trim(),mode=input.mode==="included"?"included":"byok";
    if(!provider||prompt.length<3||prompt.length>30000)return j({error:"Provider and a prompt between 3 and 30,000 characters are required."},400);
-   const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id=? AND created_at > datetime('now','-1 minute')").bind(user.id).first<{count:number}>();if((recent?.count??0)>=10)return j({error:"Rate limit reached. Try again in one minute."},429);
-   const model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider];let key:string|undefined,charged=false;
-   if(mode==="included"){key=platformKey(provider,env);if(!key)return j({error:`Included ${provider} access is not active yet. Connect your own API key.`},503);await env.DB.prepare("INSERT OR IGNORE INTO credit_accounts(user_id,balance) VALUES(?,25)").bind(user.id).run();const charge=await env.DB.prepare("UPDATE credit_accounts SET balance=balance-1,updated_at=datetime('now') WHERE user_id=? AND balance>0").bind(user.id).run();if(!charge.meta.changes)return j({error:"No included credits remain."},402);charged=true}
+   const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id=? AND created_at > datetime('now','-1 minute')").bind(user.id).first<{count:number}>(),entitlements=await accountEntitlements(env,user.id);if((recent?.count??0)>=entitlements.requestsPerMinute)return j({error:`${entitlements.name} limit reached. Try again in one minute.`},429);
+   const model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider],eventId=uid();let key:string|undefined,charged=false;
+   if(mode==="included"){key=platformKey(provider,env);if(!key)return j({error:`Included ${provider} access is not active yet. Connect your own API key.`},503);if(!await consumeIncludedCredit(env,user.id,eventId))return j({error:"No included credits remain."},402);charged=true}
    else{const row=await env.DB.prepare("SELECT ciphertext,iv FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,provider).first<{ciphertext:string;iv:string}>();if(!row)return j({error:`Connect a ${provider} API key first.`},400);key=await decrypt(row.ciphertext,row.iv,env)}
-   const eventId=uid(),started=Date.now(),upstream=await openProviderStream(provider,model,prompt,key);
-   if(!upstream.ok){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();let detail=`${provider} request failed`;try{const failure=await upstream.json() as {error?:{message?:string}};detail=failure.error?.message||detail}catch{}return j({error:detail},upstream.status)}
+   const started=Date.now(),upstream=await openProviderStream(provider,model,prompt,key);
+   if(!upstream.ok){if(charged)await refundIncludedCredit(env,user.id,eventId);let detail=`${provider} request failed`;try{const failure=await upstream.json() as {error?:{message?:string}};detail=failure.error?.message||detail}catch{}return j({error:detail},upstream.status)}
    const encoder=new TextEncoder(),stream=new ReadableStream<Uint8Array>({async start(controller){
     let text="",buffer="",inputTokens=0,outputTokens=0;
     const emit=(data:unknown)=>controller.enqueue(encoder.encode(JSON.stringify(data)+"\n"));
@@ -190,23 +191,22 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
      try{await env.DB.prepare("INSERT INTO ai_runs(id,user_id,provider,model,access_mode,prompt,response_text,input_tokens,output_tokens,latency_ms,evaluation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,prompt,text,inputTokens,outputTokens,latencyMs,JSON.stringify(evaluation)).run()}catch(historyError){if(!String(historyError).includes("no such table"))console.warn("Instruxa stream history write failed",historyError)}
      const credits=await env.DB.prepare("SELECT balance FROM credit_accounts WHERE user_id=?").bind(user.id).first<{balance:number}>();
      emit({type:"done",id:eventId,provider,model,inputTokens,outputTokens,latencyMs,evaluation,credits:credits?.balance??25});controller.close();
-    }catch(error){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();const detail=error instanceof Error?error.message:"Streaming failed";try{await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed","STREAM",Date.now()-started).run()}catch{}emit({type:"error",error:detail});controller.close()}
+    }catch(error){if(charged)await refundIncludedCredit(env,user.id,eventId);const detail=error instanceof Error?error.message:"Streaming failed";try{await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed","STREAM",Date.now()-started).run()}catch{}emit({type:"error",error:detail});controller.close()}
    }});
    return new Response(stream,{headers:{"content-type":"application/x-ndjson; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
   }
   if(url.pathname==="/api/ai/generate"&&method==="POST"){
    const input=await request.json() as Record<string,unknown>,provider=providerOf(input.provider),prompt=String(input.prompt??"").trim(),mode=input.mode==="included"?"included":"byok";
    if(!provider||prompt.length<3||prompt.length>30000)return j({error:"Provider and a prompt between 3 and 30,000 characters are required."},400);
-   const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id=? AND created_at > datetime('now','-1 minute')").bind(user.id).first<{count:number}>();if((recent?.count??0)>=10)return j({error:"Rate limit reached. Try again in one minute."},429);
-   const model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider];let key:string|undefined,charged=false;
+   const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id=? AND created_at > datetime('now','-1 minute')").bind(user.id).first<{count:number}>(),entitlements=await accountEntitlements(env,user.id);if((recent?.count??0)>=entitlements.requestsPerMinute)return j({error:`${entitlements.name} limit reached. Try again in one minute.`},429);
+   const model=String(input.model??defaults[provider]).trim().slice(0,120)||defaults[provider],eventId=uid();let key:string|undefined,charged=false;
    if(mode==="included"){
     key=platformKey(provider,env);if(!key)return j({error:`Included ${provider} access is not active yet. Connect your own API key.`},503);
-    await env.DB.prepare("INSERT OR IGNORE INTO credit_accounts(user_id,balance) VALUES(?,25)").bind(user.id).run();
-    const charge=await env.DB.prepare("UPDATE credit_accounts SET balance=balance-1,updated_at=datetime('now') WHERE user_id=? AND balance>0").bind(user.id).run();if(!charge.meta.changes)return j({error:"No included credits remain."},402);charged=true;
+    if(!await consumeIncludedCredit(env,user.id,eventId))return j({error:"No included credits remain."},402);charged=true;
    }else{
     const row=await env.DB.prepare("SELECT ciphertext,iv FROM provider_keys WHERE user_id=? AND provider=?").bind(user.id,provider).first<{ciphertext:string;iv:string}>();if(!row)return j({error:`Connect a ${provider} API key first.`},400);key=await decrypt(row.ciphertext,row.iv,env);
    }
-   const eventId=uid(),started=Date.now();
+   const started=Date.now();
    try{
     const result=await callProvider(provider,model,prompt,key),latencyMs=Date.now()-started,evaluation=evaluate(prompt,result.text);
     await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,input_tokens,output_tokens,credits_used,status,latency_ms) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,result.inputTokens,result.outputTokens,charged?1:0,"succeeded",latencyMs).run();
@@ -214,7 +214,7 @@ export async function handleAiApi(request:Request,env:AiEnv,user:GatewayUser):Pr
     const credits=await env.DB.prepare("SELECT balance FROM credit_accounts WHERE user_id=?").bind(user.id).first<{balance:number}>();
     return j({id:eventId,...result,provider,model,mode,credits:credits?.balance??25,latencyMs,evaluation});
    }
-   catch(error){if(charged)await env.DB.prepare("UPDATE credit_accounts SET balance=balance+1 WHERE user_id=?").bind(user.id).run();const detail=error instanceof Error?error.message:"Provider request failed";await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed",detail.split(":").slice(0,2).join(":"),Date.now()-started).run();if(detail.startsWith("PROVIDER:")){const parts=detail.split(":");return j({error:parts.slice(2).join(":")||"Provider rejected the request."},Number(parts[1])||502)}throw error;}
+   catch(error){if(charged)await refundIncludedCredit(env,user.id,eventId);const detail=error instanceof Error?error.message:"Provider request failed";await env.DB.prepare("INSERT INTO usage_events(id,user_id,provider,model,access_mode,credits_used,status,error_code,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)").bind(eventId,user.id,provider,model,mode,0,"failed",detail.split(":").slice(0,2).join(":"),Date.now()-started).run();if(detail.startsWith("PROVIDER:")){const parts=detail.split(":");return j({error:parts.slice(2).join(":")||"Provider rejected the request."},Number(parts[1])||502)}throw error;}
   }
   return j({error:"Not found."},404);
  }catch(error){const detail=error instanceof Error?error.message:String(error);console.error("Instruxa AI gateway",detail);if(detail==="BYOK_NOT_CONFIGURED")return j({error:"BYOK_MASTER_KEY is missing from the Worker runtime secrets."},503);if(detail==="BYOK_MASTER_KEY_INVALID")return j({error:"BYOK_MASTER_KEY must be valid Base64 that decodes to exactly 32 bytes."},503);if(detail.includes("no such table"))return j({error:"AI database migration is not applied."},503);return j({error:"AI request could not be completed."},500)}
