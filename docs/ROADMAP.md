@@ -66,6 +66,10 @@ Remaining:
 - Plan-aware project and generation-rate limits
 - Stripe subscription checkout and customer portal
 - Signed, replay-bounded, idempotent billing webhooks
+- Explicit disabled/test/live safety modes
+- Test/live credential and webhook isolation
+- Checkout idempotency and duplicate-subscription prevention
+- Paid-only credit-pack fulfillment
 - One-time credit-pack checkout
 - Immutable credit ledger and failed-run refunds
 - Public pricing with account-aware conversion paths
@@ -80,7 +84,6 @@ Remaining:
 - Reconciliation and operator tooling
 - Abuse monitoring and provider-cost guardrails
 - Enterprise contracting and custom entitlements
-- Abuse monitoring and operational analytics
 
 ## Public paid-launch gates
 

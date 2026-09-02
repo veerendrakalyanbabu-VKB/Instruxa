@@ -1,3 +1,5 @@
+import { billingMode, stripeEventMatchesMode, stripeRuntimeReady, validStripePriceId, verifyStripeSignature } from "./billing-core.mjs";
+
 export type BillingUser = { id: string; name: string; email: string };
 
 export interface BillingEnv {
@@ -10,6 +12,7 @@ export interface BillingEnv {
   STRIPE_PRICE_CREDITS_500?: string;
   STRIPE_PRICE_CREDITS_2000?: string;
   APP_URL?: string;
+  BILLING_MODE?: "disabled" | "test" | "live";
 }
 
 type PlanId = "free" | "pro" | "team";
@@ -35,7 +38,8 @@ const unixDate = (value: unknown) => Number(value) > 0 ? new Date(Number(value) 
 const sha256 = async (value: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, "0")).join("");
 
 function publicCatalog(env: BillingEnv) {
-  return Object.values(planCatalog).map(plan => ({ ...plan, checkoutReady: plan.id === "free" || Boolean(plan.id === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_TEAM) }));
+  const ready = stripeRuntimeReady(env);
+  return Object.values(planCatalog).map(plan => ({ ...plan, checkoutReady: plan.id === "free" || Boolean(ready && validStripePriceId(plan.id === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_TEAM)) }));
 }
 
 export async function accountEntitlements(env: BillingEnv, userId: string) {
@@ -108,10 +112,12 @@ function appOrigin(request: Request, env: BillingEnv) {
   return new URL(request.url).origin;
 }
 
-async function stripeRequest(env: BillingEnv, path: string, values: Record<string, string>) {
-  if (!env.STRIPE_SECRET_KEY) throw new Error("BILLING_NOT_CONFIGURED");
+async function stripeRequest(env: BillingEnv, path: string, values: Record<string, string>, idempotencyKey?: string) {
+  if (!stripeRuntimeReady(env) || !env.STRIPE_SECRET_KEY) throw new Error("BILLING_NOT_CONFIGURED");
   const body = new URLSearchParams(values);
-  const response = await fetch(`https://api.stripe.com/v1/${path}`, { method: "POST", headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded" }, body });
+  const headers: Record<string, string> = { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded" };
+  if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, { method: "POST", headers, body });
   const data = await response.json() as Record<string, unknown> & { error?: { message?: string } };
   if (!response.ok) throw new Error(`STRIPE:${response.status}:${data.error?.message ?? "Stripe request failed."}`);
   return data;
@@ -130,8 +136,9 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
       } catch (error) {
         if (String(error).includes("no such table")) migrationRequired = true; else throw error;
       }
-      const packs = creditPacks.map(pack => ({ id: pack.id, credits: pack.credits, price: pack.price, checkoutReady: Boolean(env[pack.priceKey]) }));
-      return json({ subscription, entitlements: planCatalog[safePlan(subscription.planId)], credits: await creditBalance(env, user.id), plans: publicCatalog(env), creditPacks: packs, ledger, billingConfigured: Boolean(env.STRIPE_SECRET_KEY), migrationRequired });
+      const configured = stripeRuntimeReady(env);
+      const packs = creditPacks.map(pack => ({ id: pack.id, credits: pack.credits, price: pack.price, checkoutReady: Boolean(configured && validStripePriceId(env[pack.priceKey])) }));
+      return json({ subscription, entitlements: planCatalog[safePlan(subscription.planId)], credits: await creditBalance(env, user.id), plans: publicCatalog(env), creditPacks: packs, ledger, billingConfigured: configured, billingMode: billingMode(env), migrationRequired });
     }
     if (url.pathname === "/api/billing/checkout" && request.method === "POST") {
       const input = await request.json() as Record<string, unknown>;
@@ -149,8 +156,9 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
         priceId = env[pack.priceKey] ?? "";
         metadata = { ...metadata, kind: "credit_pack", credits: String(pack.credits), pack_id: pack.id };
       }
-      if (!env.STRIPE_SECRET_KEY || !priceId) return json({ error: "Secure checkout is not configured for this product yet." }, 503);
-      const existing = await env.DB.prepare("SELECT provider_customer_id AS customerId FROM subscriptions WHERE user_id=?").bind(user.id).first<{ customerId: string | null }>();
+      if (!stripeRuntimeReady(env) || !validStripePriceId(priceId)) return json({ error: "Secure checkout is not configured for this product yet." }, 503);
+      const existing = await env.DB.prepare("SELECT provider_customer_id AS customerId,provider_subscription_id AS subscriptionId,status FROM subscriptions WHERE user_id=?").bind(user.id).first<{ customerId: string | null; subscriptionId: string | null; status: string }>();
+      if (kind === "subscription" && existing?.subscriptionId && ["active", "trialing", "past_due"].includes(existing.status)) return json({ error: "Use Manage billing to change an existing subscription safely." }, 409);
       const values: Record<string, string> = {
         mode: kind === "subscription" ? "subscription" : "payment",
         "line_items[0][price]": priceId,
@@ -164,13 +172,17 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
       for (const [key, value] of Object.entries(metadata)) values[`metadata[${key}]`] = value;
       if (kind === "subscription") for (const [key, value] of Object.entries(metadata)) values[`subscription_data[metadata][${key}]`] = value;
       if (existing?.customerId) values.customer = existing.customerId; else values.customer_email = user.email;
-      const session = await stripeRequest(env, "checkout/sessions", values);
+      const requestKey = request.headers.get("x-idempotency-key");
+      const idempotencyKey = requestKey && /^[A-Za-z0-9_-]{16,120}$/.test(requestKey) ? `instruxa_${user.id}_${requestKey}` : undefined;
+      const session = await stripeRequest(env, "checkout/sessions", values, idempotencyKey);
+      if (typeof session.url !== "string" || !session.url.startsWith("https://checkout.stripe.com/")) throw new Error("STRIPE:502:Stripe returned an invalid checkout URL.");
       return json({ url: session.url });
     }
     if (url.pathname === "/api/billing/portal" && request.method === "POST") {
       const row = await env.DB.prepare("SELECT provider_customer_id AS customerId FROM subscriptions WHERE user_id=?").bind(user.id).first<{ customerId: string | null }>();
       if (!row?.customerId) return json({ error: "No billing account is connected yet." }, 400);
       const session = await stripeRequest(env, "billing_portal/sessions", { customer: row.customerId, return_url: `${appOrigin(request, env)}/#billing` });
+      if (typeof session.url !== "string" || !session.url.startsWith("https://billing.stripe.com/")) throw new Error("STRIPE:502:Stripe returned an invalid billing portal URL.");
       return json({ url: session.url });
     }
     return json({ error: "Not found." }, 404);
@@ -182,22 +194,6 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
     console.error("Instruxa billing API", detail);
     return json({ error: "Billing request could not be completed." }, 500);
   }
-}
-
-async function verifyStripeSignature(payload: string, signature: string | null, secret: string) {
-  if (!signature) return false;
-  const parts = signature.split(",").map(part => part.split("=", 2));
-  const timestamp = parts.find(([key]) => key === "t")?.[1];
-  const signatures = parts.filter(([key]) => key === "v1").map(([, value]) => value);
-  if (!timestamp || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300 || !signatures.length) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-  const data = new TextEncoder().encode(`${timestamp}.${payload}`);
-  for (const candidate of signatures) {
-    if (!/^[0-9a-f]{64}$/i.test(candidate)) continue;
-    const bytes = Uint8Array.from(candidate.match(/.{2}/g) ?? [], value => Number.parseInt(value, 16));
-    if (await crypto.subtle.verify("HMAC", key, bytes, data)) return true;
-  }
-  return false;
 }
 
 async function upsertSubscription(env: BillingEnv, object: StripeObject) {
@@ -213,14 +209,24 @@ async function upsertSubscription(env: BillingEnv, object: StripeObject) {
   if (["active", "trialing"].includes(acceptedStatus) && planId !== "free" && subscriptionId) await addCredits(env, userId, planCatalog[planId].monthlyCredits, "plan_grant", "stripe", `subscription-start:${subscriptionId}`, `${planCatalog[planId].name} plan credit grant`);
 }
 
+async function linkCheckoutSubscription(env: BillingEnv, object: StripeObject) {
+  const metadata = object.metadata ?? {};
+  const userId = metadata.user_id || String(object.client_reference_id ?? "");
+  const customerId = stripeId(object.customer);
+  const subscriptionId = stripeId(object.subscription);
+  if (!userId || !subscriptionId) return;
+  const planId = safePlan(metadata.plan_id);
+  await env.DB.prepare(`INSERT INTO subscriptions(user_id,plan_id,status,billing_provider,provider_customer_id,provider_subscription_id) VALUES(?,?,'incomplete','stripe',?,?) ON CONFLICT(user_id) DO UPDATE SET provider_customer_id=COALESCE(excluded.provider_customer_id,subscriptions.provider_customer_id),provider_subscription_id=COALESCE(excluded.provider_subscription_id,subscriptions.provider_subscription_id),updated_at=datetime('now')`).bind(userId, planId, customerId, subscriptionId).run();
+}
+
 async function processStripeEvent(env: BillingEnv, event: Record<string, unknown>) {
   const type = String(event.type ?? ""), data = event.data as { object?: StripeObject } | undefined, object = data?.object ?? {};
-  if (type === "checkout.session.completed") {
+  if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
     const metadata = object.metadata ?? {}, userId = metadata.user_id || String(object.client_reference_id ?? "");
     if (metadata.kind === "credit_pack" && userId) {
       const credits = Number(metadata.credits);
-      if ([100, 500, 2000].includes(credits)) await addCredits(env, userId, credits, "purchase", "stripe", `checkout:${object.id}`, `${credits} credit pack`);
-    } else await upsertSubscription(env, object);
+      if (object.payment_status === "paid" && [100, 500, 2000].includes(credits)) await addCredits(env, userId, credits, "purchase", "stripe", `checkout:${object.id}`, `${credits} credit pack`);
+    } else await linkCheckoutSubscription(env, object);
     return;
   }
   if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(type)) {
@@ -237,16 +243,20 @@ async function processStripeEvent(env: BillingEnv, event: Record<string, unknown
 }
 
 export async function handleBillingWebhook(request: Request, env: BillingEnv): Promise<Response> {
-  if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: "Billing webhook is not configured." }, 503);
+  const mode = billingMode(env);
+  if (!stripeRuntimeReady(env) || !env.STRIPE_WEBHOOK_SECRET) return json({ error: "Billing webhook is not configured." }, 503);
   const payload = await request.text();
   if (!await verifyStripeSignature(payload, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET)) return json({ error: "Invalid webhook signature." }, 400);
   let event: Record<string, unknown>;
   try { event = JSON.parse(payload) as Record<string, unknown>; } catch { return json({ error: "Invalid webhook payload." }, 400); }
+  if (!stripeEventMatchesMode(event, mode)) return json({ error: "Webhook mode does not match the configured billing mode." }, 400);
   const eventId = String(event.id ?? ""), eventType = String(event.type ?? "unknown");
   if (!eventId) return json({ error: "Webhook event ID is required." }, 400);
   const hash = await sha256(payload);
-  const existing = await env.DB.prepare("SELECT status FROM billing_events WHERE id=?").bind(eventId).first<{ status: string }>();
-  if (existing?.status === "processed" || existing?.status === "processing") return json({ received: true, duplicate: true });
+  const existing = await env.DB.prepare("SELECT status,payload_hash AS payloadHash,created_at AS createdAt FROM billing_events WHERE id=?").bind(eventId).first<{ status: string; payloadHash: string; createdAt: string }>();
+  if (existing && existing.payloadHash !== hash) return json({ error: "Webhook event payload mismatch." }, 409);
+  if (existing?.status === "processed") return json({ received: true, duplicate: true });
+  if (existing?.status === "processing" && Date.now() - Date.parse(existing.createdAt) < 300_000) return json({ received: true, duplicate: true });
   await env.DB.prepare(`INSERT INTO billing_events(id,provider,event_type,payload_hash,status) VALUES(?,?,?,?, 'processing') ON CONFLICT(id) DO UPDATE SET status='processing',error_code=NULL`).bind(eventId, "stripe", eventType, hash).run();
   try {
     await processStripeEvent(env, event);
