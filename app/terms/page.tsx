@@ -1,0 +1,15 @@
+import type { Metadata } from "next";
+import { LegalPage } from "@/components/legal-page";
+
+export const metadata:Metadata={title:"Terms — Instruxa",description:"Private-beta terms for using the Instruxa prompt engineering workspace."};
+
+export default function TermsPage(){return <LegalPage eyebrow="TERMS" title="Private-beta terms" summary="The operating rules for evaluating Instruxa before commercial launch." sections={[
+ {title:"Beta service",content:<p>Instruxa is an actively developed private-beta product. Features, model availability, limits, pricing proposals, and data structures may change. Availability is not guaranteed, and the service may be suspended to protect users, providers, or infrastructure.</p>},
+ {title:"Account responsibilities",content:<ul><li>Provide accurate account information and protect your password and session.</li><li>Do not share access in a way that bypasses plan or security controls.</li><li>Notify the operator privately if you suspect unauthorized access.</li><li>Remain responsible for prompts, uploaded context, generated outputs, and downstream use.</li></ul>},
+ {title:"Acceptable use",content:<p>You may not use Instruxa to violate law, infringe rights, distribute malware, bypass provider protections, obtain unauthorized access, disrupt the service, automate abuse, or process information you are not permitted to use. Provider-specific policies also apply to model execution.</p>},
+ {title:"Bring-your-own keys",content:<p>BYOK credentials remain subject to the selected provider&apos;s account, pricing, quotas, and terms. Instruxa encrypts stored keys but cannot control provider availability, pricing, model changes, suspensions, or output behavior.</p>},
+ {title:"AI output",content:<p>Generated responses can be incomplete or incorrect. Evaluation scores measure observable response construction and do not certify factual accuracy, security, legality, or fitness for a particular purpose. Users must review outputs before relying on or deploying them.</p>},
+ {title:"Plans and payments",content:<p>Displayed Free, Pro, and Team prices are proposed launch pricing. Live checkout remains disabled until Stripe test-mode verification and commercial policies are complete. Final billing, renewal, cancellation, refund, tax, and invoice terms will be presented before a paid transaction.</p>},
+ {title:"Intellectual property",content:<p>You retain responsibility for content you submit. Instruxa&apos;s source, brand, interface, and product materials remain protected by the repository&apos;s stated ownership terms. No commercial reuse license is granted unless expressly provided in writing.</p>},
+ {title:"Limitations",content:<p>The beta is provided for evaluation without production SLA or warranty. To the extent permitted by applicable law, Instruxa is not responsible for provider outages, model outputs, lost opportunities, indirect loss, or use outside these terms. Final commercial limitations require legal review before paid launch.</p>},
+ ]}/>}

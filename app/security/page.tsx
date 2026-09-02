@@ -1,0 +1,12 @@
+import type { Metadata } from "next";
+import { LegalPage } from "@/components/legal-page";
+
+export const metadata:Metadata={title:"Security — Instruxa",description:"Implemented security boundaries and current private-beta limitations for Instruxa."};
+
+export default function SecurityPage(){return <LegalPage eyebrow="SECURITY" title="Security by design" summary="Implemented controls, explicit boundaries, and an honest view of what remains before commercial launch." sections={[
+ {title:"Implemented controls",content:<ul><li>PBKDF2-SHA-256 password derivation with unique salts.</li><li>Opaque session tokens stored only as SHA-256 digests.</li><li>HttpOnly, Secure, SameSite=Lax session cookies.</li><li>Authenticated, user-scoped projects, keys, usage, analytics, and run history.</li><li>AES-256-GCM encryption for stored provider keys.</li><li>Bounded provider retries, prompt limits, and per-user request limits.</li><li>Server-authoritative plan limits, credit accounting, and failed-call refunds.</li><li>Signed, replay-bounded, idempotent Stripe webhook foundation.</li></ul>},
+ {title:"Credential boundary",content:<p>Provider keys are decrypted only inside the Worker for an authenticated request to the selected provider. Plaintext keys are never returned to the browser, copied into run history, or intentionally written to application logs.</p>},
+ {title:"Billing boundary",content:<p>The browser never supplies authoritative prices or credit quantities. Stripe Price IDs are selected server-side. Webhook signatures are verified before subscription or credit fulfillment, and raw payment payloads or full card data are not stored in D1.</p>},
+ {title:"Current limitations",content:<ul><li>Email verification, password recovery, and multi-factor authentication are not yet available.</li><li>Formal organization RBAC, audit retention, and automated key rotation remain planned.</li><li>Stripe is not activated for live payments.</li><li>Independent penetration testing and private-beta load testing remain launch gates.</li><li>Response evaluation is not a factual-accuracy or safety guarantee.</li></ul>},
+ {title:"Report privately",content:<p>Do not open a public issue for authentication bypasses, exposed credentials, billing errors, or private-data exposure. Follow the repository&apos;s <a href="https://github.com/veerendrakalyanbabu-VKB/Instruxa/blob/main/SECURITY.md">private reporting guidance</a> and remove all secrets from evidence.</p>},
+ ]}/>}

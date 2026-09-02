@@ -62,6 +62,8 @@ The compiler turns a goal, audience, tone, and model target into a complete inst
 | Persistent winner selection | Migration 0004 |
 | Best-response synthesis | Available after comparison |
 | Usage and intelligence dashboard | Available |
+| Public pricing and account-aware plan CTAs | Available |
+| Privacy, Terms, and Security trust-center routes | Available; legal review required before paid launch |
 | Teams, roles, approvals, and audit trails | Planned |
 | Plan entitlements and credit ledger | Migration 0005 |
 | Stripe checkout, portal, and signed webhooks | Ready for operator configuration |
@@ -232,6 +234,8 @@ The connected Cloudflare build uses:
 5. Preserve a deterministic, zero-provider-cost compiler path.
 6. Document implemented, partial, and planned capabilities honestly.
 7. Optimize for accessibility, performance, reduced motion, and mobile use.
+
+Public product claims must describe implemented behavior. Planned team and governance capabilities belong in the roadmap until their enforcement exists in production.
 
 ## Roadmap
 

@@ -68,6 +68,9 @@ Remaining:
 - Signed, replay-bounded, idempotent billing webhooks
 - One-time credit-pack checkout
 - Immutable credit ledger and failed-run refunds
+- Public pricing with account-aware conversion paths
+- Functional Privacy, Terms, and Security routes
+- Accessibility labels and truthful capability messaging
 
 Remaining:
 
@@ -90,5 +93,5 @@ A paid launch requires:
 - Billing idempotency and reconciliation
 - Automated migration verification
 - Monitoring and alerting
-- Privacy policy, terms, and data-retention policy
+- Qualified legal review of privacy, terms, billing, and data-retention policies
 - Private-beta load and security testing
