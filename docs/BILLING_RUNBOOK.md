@@ -35,12 +35,12 @@ Use actual `price_…` identifiers, not Product IDs or payment links.
 Configure runtime values on the Worker, never plaintext repository files:
 
 - `BILLING_MODE=test`
-- `STRIPE_SECRET_KEY=sk_test_…` as a secret
+- `STRIPE_SECRET_KEY=rk_test_…` as a secret (preferred least-privilege restricted key; `sk_test_…` is supported for initial sandbox verification)
 - `STRIPE_WEBHOOK_SECRET=whsec_…` as a secret
 - The five Price IDs above
 - `APP_URL=https://<canonical-worker-or-custom-domain>`
 
-The gateway fails closed when the mode is absent, a secret uses the wrong mode, or a Price ID is malformed.
+The gateway fails closed when the mode is absent, a server key uses the wrong mode, or a Price ID is malformed.
 
 ## 4. Webhook endpoint
 

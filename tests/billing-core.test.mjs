@@ -17,13 +17,16 @@ test("billing is fail-closed unless a mode is explicit", () => {
 
 test("Stripe credentials must match the selected mode", () => {
   assert.equal(stripeKeyMatchesMode("sk_test_example", "test"), true);
+  assert.equal(stripeKeyMatchesMode("rk_test_example", "test"), true);
   assert.equal(stripeKeyMatchesMode("sk_live_example", "test"), false);
   assert.equal(stripeKeyMatchesMode("sk_test_example", "live"), false);
   assert.equal(stripeKeyMatchesMode("sk_live_example", "live"), true);
+  assert.equal(stripeKeyMatchesMode("rk_live_example", "live"), true);
 });
 
 test("checkout readiness requires a mode-compatible secret", () => {
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "test", STRIPE_SECRET_KEY: "sk_test_example" }), true);
+  assert.equal(stripeRuntimeReady({ BILLING_MODE: "test", STRIPE_SECRET_KEY: "rk_test_example" }), true);
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "test", STRIPE_SECRET_KEY: "sk_live_example" }), false);
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "live", STRIPE_SECRET_KEY: "sk_live_example" }), true);
 });

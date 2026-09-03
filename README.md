@@ -197,13 +197,13 @@ Never add provider credentials or the master key as repository files or plaintex
 Stripe billing is optional and fail-closed. Configure these as Worker runtime secrets or variables only when the Stripe products exist:
 
 - `BILLING_MODE` — use `test` during verification; omit it or set `disabled` to keep checkout closed
-- `STRIPE_SECRET_KEY` — secret key
+- `STRIPE_SECRET_KEY` — sandbox server key; prefer a least-privilege `rk_test_…` restricted key over a full-access `sk_test_…` key
 - `STRIPE_WEBHOOK_SECRET` — signing secret for `POST /api/billing/webhook`
 - `STRIPE_PRICE_PRO` and `STRIPE_PRICE_TEAM` — recurring Price IDs
 - `STRIPE_PRICE_CREDITS_100`, `STRIPE_PRICE_CREDITS_500`, and `STRIPE_PRICE_CREDITS_2000` — one-time Price IDs
 - `APP_URL` — canonical HTTPS production origin used for checkout returns
 
-Do not set `BILLING_MODE=live` until webhook delivery, renewals, cancellations, refunds, and reconciliation have passed in Stripe test mode. A test secret cannot activate live mode, and a live secret cannot activate test mode.
+Do not set `BILLING_MODE=live` until webhook delivery, renewals, cancellations, refunds, and reconciliation have passed in Stripe test mode. Test keys cannot activate live mode, and live keys cannot activate test mode.
 
 ### Stripe test-mode activation
 

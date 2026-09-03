@@ -7,8 +7,8 @@ export function billingMode(env) {
 
 /** Prevent test credentials from being used in live mode, and vice versa. */
 export function stripeKeyMatchesMode(secretKey, mode) {
-  if (mode === "test") return typeof secretKey === "string" && secretKey.startsWith("sk_test_");
-  if (mode === "live") return typeof secretKey === "string" && secretKey.startsWith("sk_live_");
+  if (mode === "test") return typeof secretKey === "string" && /^(?:sk|rk)_test_/.test(secretKey);
+  if (mode === "live") return typeof secretKey === "string" && /^(?:sk|rk)_live_/.test(secretKey);
   return false;
 }
 
