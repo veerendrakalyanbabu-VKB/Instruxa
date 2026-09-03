@@ -1,4 +1,4 @@
-import { billingMode, stripeEventMatchesMode, stripeRuntimeReady, validStripePriceId, verifyStripeSignature } from "./billing-core.mjs";
+import { billingMode, runtimeValue, stripeEventMatchesMode, stripeKeyMatchesMode, stripeRuntimeReady, validStripePriceId, verifyStripeSignature } from "./billing-core.mjs";
 
 export type BillingUser = { id: string; name: string; email: string };
 
@@ -39,7 +39,18 @@ const sha256 = async (value: string) => [...new Uint8Array(await crypto.subtle.d
 
 function publicCatalog(env: BillingEnv) {
   const ready = stripeRuntimeReady(env);
-  return Object.values(planCatalog).map(plan => ({ ...plan, checkoutReady: plan.id === "free" || Boolean(ready && validStripePriceId(plan.id === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_TEAM)) }));
+  const mode = billingMode(env);
+  const key = runtimeValue(env.STRIPE_SECRET_KEY);
+  return Object.values(planCatalog).map(plan => {
+    if (plan.id === "free") return { ...plan, checkoutReady: true, checkoutIssue: null };
+    const price = plan.id === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_TEAM;
+    let checkoutIssue: string | null = null;
+    if (mode === "disabled") checkoutIssue = "Set BILLING_MODE to test and deploy the latest Worker version.";
+    else if (!key) checkoutIssue = "Add STRIPE_SECRET_KEY to the active Worker deployment.";
+    else if (!stripeKeyMatchesMode(key, mode)) checkoutIssue = `Use a ${mode === "test" ? "sk_test_ or rk_test_" : "sk_live_ or rk_live_"} server key for ${mode} mode.`;
+    else if (!validStripePriceId(price)) checkoutIssue = `Add a valid Stripe Price ID for ${plan.name} to the active Worker deployment.`;
+    return { ...plan, checkoutReady: Boolean(ready && validStripePriceId(price)), checkoutIssue };
+  });
 }
 
 export async function accountEntitlements(env: BillingEnv, userId: string) {
@@ -106,16 +117,18 @@ async function addCredits(env: BillingEnv, userId: string, amount: number, kind:
 }
 
 function appOrigin(request: Request, env: BillingEnv) {
-  if (env.APP_URL) {
-    try { const configured = new URL(env.APP_URL); if (configured.protocol === "https:") return configured.origin; } catch { /* use request origin */ }
+  const appUrl = runtimeValue(env.APP_URL);
+  if (appUrl) {
+    try { const configured = new URL(appUrl); if (configured.protocol === "https:") return configured.origin; } catch { /* use request origin */ }
   }
   return new URL(request.url).origin;
 }
 
 async function stripeRequest(env: BillingEnv, path: string, values: Record<string, string>, idempotencyKey?: string) {
-  if (!stripeRuntimeReady(env) || !env.STRIPE_SECRET_KEY) throw new Error("BILLING_NOT_CONFIGURED");
+  const secretKey = runtimeValue(env.STRIPE_SECRET_KEY);
+  if (!stripeRuntimeReady(env) || !secretKey) throw new Error("BILLING_NOT_CONFIGURED");
   const body = new URLSearchParams(values);
-  const headers: Record<string, string> = { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded" };
+  const headers: Record<string, string> = { authorization: `Bearer ${secretKey}`, "content-type": "application/x-www-form-urlencoded" };
   if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
   const response = await fetch(`https://api.stripe.com/v1/${path}`, { method: "POST", headers, body });
   const data = await response.json() as Record<string, unknown> & { error?: { message?: string } };
@@ -148,12 +161,12 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
       if (kind === "subscription") {
         const plan = safePlan(input.planId);
         if (plan === "free") return json({ error: "Choose Pro or Team to open checkout." }, 400);
-        priceId = plan === "pro" ? env.STRIPE_PRICE_PRO ?? "" : env.STRIPE_PRICE_TEAM ?? "";
+        priceId = runtimeValue(plan === "pro" ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_TEAM);
         metadata = { ...metadata, kind: "subscription", plan_id: plan };
       } else {
         const pack = creditPacks.find(item => item.id === input.packId);
         if (!pack) return json({ error: "Choose a valid credit pack." }, 400);
-        priceId = env[pack.priceKey] ?? "";
+        priceId = runtimeValue(env[pack.priceKey]);
         metadata = { ...metadata, kind: "credit_pack", credits: String(pack.credits), pack_id: pack.id };
       }
       if (!stripeRuntimeReady(env) || !validStripePriceId(priceId)) return json({ error: "Secure checkout is not configured for this product yet." }, 503);
@@ -244,9 +257,10 @@ async function processStripeEvent(env: BillingEnv, event: Record<string, unknown
 
 export async function handleBillingWebhook(request: Request, env: BillingEnv): Promise<Response> {
   const mode = billingMode(env);
-  if (!stripeRuntimeReady(env) || !env.STRIPE_WEBHOOK_SECRET) return json({ error: "Billing webhook is not configured." }, 503);
+  const webhookSecret = runtimeValue(env.STRIPE_WEBHOOK_SECRET);
+  if (!stripeRuntimeReady(env) || !webhookSecret) return json({ error: "Billing webhook is not configured." }, 503);
   const payload = await request.text();
-  if (!await verifyStripeSignature(payload, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET)) return json({ error: "Invalid webhook signature." }, 400);
+  if (!await verifyStripeSignature(payload, request.headers.get("stripe-signature"), webhookSecret)) return json({ error: "Invalid webhook signature." }, 400);
   let event: Record<string, unknown>;
   try { event = JSON.parse(payload) as Record<string, unknown>; } catch { return json({ error: "Invalid webhook payload." }, 400); }
   if (!stripeEventMatchesMode(event, mode)) return json({ error: "Webhook mode does not match the configured billing mode." }, 400);
