@@ -22,6 +22,7 @@ test("Stripe credentials must match the selected mode", () => {
   assert.equal(stripeKeyMatchesMode("sk_test_example", "live"), false);
   assert.equal(stripeKeyMatchesMode("sk_live_example", "live"), true);
   assert.equal(stripeKeyMatchesMode("rk_live_example", "live"), true);
+  assert.equal(stripeKeyMatchesMode("  sk_test_example\n", "test"), true);
 });
 
 test("checkout readiness requires a mode-compatible secret", () => {
@@ -29,6 +30,7 @@ test("checkout readiness requires a mode-compatible secret", () => {
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "test", STRIPE_SECRET_KEY: "rk_test_example" }), true);
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "test", STRIPE_SECRET_KEY: "sk_live_example" }), false);
   assert.equal(stripeRuntimeReady({ BILLING_MODE: "live", STRIPE_SECRET_KEY: "sk_live_example" }), true);
+  assert.equal(stripeRuntimeReady({ BILLING_MODE: " TEST ", STRIPE_SECRET_KEY: "  rk_test_example " }), true);
 });
 
 test("only Stripe Price IDs pass product validation", () => {
@@ -36,6 +38,7 @@ test("only Stripe Price IDs pass product validation", () => {
   assert.equal(validStripePriceId("prod_1ExampleABC123"), false);
   assert.equal(validStripePriceId("https://example.com"), false);
   assert.equal(validStripePriceId(undefined), false);
+  assert.equal(validStripePriceId("  price_1ExampleABC123\n"), true);
 });
 
 test("webhook livemode must match the configured runtime", () => {
