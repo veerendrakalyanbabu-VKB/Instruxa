@@ -1,19 +1,26 @@
 const stripePricePattern = /^price_[A-Za-z0-9]+$/;
 
+/** Normalize Dashboard-managed values without ever exposing their contents. */
+export function runtimeValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 /** Return the explicit commercial operating mode. Billing is disabled by default. */
 export function billingMode(env) {
-  return env.BILLING_MODE === "test" || env.BILLING_MODE === "live" ? env.BILLING_MODE : "disabled";
+  const mode = runtimeValue(env.BILLING_MODE).toLowerCase();
+  return mode === "test" || mode === "live" ? mode : "disabled";
 }
 
 /** Prevent test credentials from being used in live mode, and vice versa. */
 export function stripeKeyMatchesMode(secretKey, mode) {
-  if (mode === "test") return typeof secretKey === "string" && /^(?:sk|rk)_test_/.test(secretKey);
-  if (mode === "live") return typeof secretKey === "string" && /^(?:sk|rk)_live_/.test(secretKey);
+  const key = runtimeValue(secretKey);
+  if (mode === "test") return /^(?:sk|rk)_test_/.test(key);
+  if (mode === "live") return /^(?:sk|rk)_live_/.test(key);
   return false;
 }
 
 export function validStripePriceId(value) {
-  return typeof value === "string" && stripePricePattern.test(value);
+  return stripePricePattern.test(runtimeValue(value));
 }
 
 export function stripeRuntimeReady(env) {
