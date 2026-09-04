@@ -21,6 +21,7 @@
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827">
   <img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white">
   <img alt="D1" src="https://img.shields.io/badge/Database-Cloudflare_D1-F38020">
+  <a href="LICENSE"><img alt="License: Elastic License 2.0" src="https://img.shields.io/badge/License-Elastic%202.0-005571"></a>
 </p>
 
 > [!IMPORTANT]
@@ -255,8 +256,10 @@ The next product milestones are Stripe test-mode activation, richer evaluation d
 
 Instruxa is currently owner-led. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Security reports must follow [SECURITY.md](SECURITY.md) and must not be posted publicly.
 
-## Ownership
+## License
 
-Copyright © 2026 K. Veerendra Kalyan Babu. All rights reserved.
+Copyright © 2026 K. Veerendra Kalyan Babu.
 
-No license is granted for commercial reuse, redistribution, or derivative products without written permission.
+Instruxa source code is available under the [Elastic License 2.0](LICENSE). You may use, copy, modify, and redistribute the software subject to that license. You may not offer Instruxa to third parties as a hosted or managed service that exposes a substantial set of its functionality, circumvent license-key protections, or remove licensing and copyright notices.
+
+ELv2 is a source-available license, not an OSI-approved open-source license. Use of the hosted Instruxa service is governed separately by the product Terms and Privacy Policy. See [Licensing](docs/LICENSING.md) or contact [veerendra.kalyanbabu@gmail.com](mailto:veerendra.kalyanbabu@gmail.com) for commercial licensing questions.
