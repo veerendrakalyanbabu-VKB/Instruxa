@@ -108,7 +108,7 @@ Instruxa has a server-authoritative commercial layer rather than trusting prices
 - Immutable user-scoped credit ledger
 - Automatic included-credit refund records for failed AI executions
 
-The code is production-oriented, but live charges remain disabled until the operator applies migration 0005 and configures Stripe products, webhook signing, and runtime secrets.
+Live charges remain disabled. The reference deployment has migration 0005 applied and Stripe test-mode products, webhook signing, and runtime secrets configured; production activation remains gated on the billing runbook and live-mode verification.
 
 ## Security architecture
 
