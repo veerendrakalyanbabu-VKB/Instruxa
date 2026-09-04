@@ -24,7 +24,7 @@
 </p>
 
 > [!IMPORTANT]
-> Instruxa is an actively developed private-beta product. Authentication, saved projects, encrypted BYOK, Gemini execution, usage tracking, and the Response Lab foundation are implemented. Subscription billing and enterprise collaboration are not active.
+> Instruxa is an actively developed private-beta product. Authentication, saved projects, encrypted BYOK, multi-model execution, usage tracking, Response Lab, and Stripe sandbox billing are implemented. Live billing and enterprise collaboration are not active.
 
 ## What Instruxa does
 
@@ -66,7 +66,8 @@ The compiler turns a goal, audience, tone, and model target into a complete inst
 | Privacy, Terms, and Security trust-center routes | Available; legal review required before paid launch |
 | Teams, roles, approvals, and audit trails | Planned |
 | Plan entitlements and credit ledger | Migration 0005 |
-| Stripe checkout, portal, and signed webhooks | Ready for operator configuration |
+| Stripe checkout and signed webhooks | Sandbox configured; end-to-end verification required |
+| Stripe Customer Portal | Operator configuration and sandbox verification required |
 
 ## Response Lab
 
