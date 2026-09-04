@@ -29,6 +29,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Lint
         run: npm run lint
+      - name: Type check
+        run: npm run typecheck
       - name: Validate production Worker build
         shell: bash
         run: |

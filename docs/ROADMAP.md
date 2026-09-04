@@ -78,8 +78,7 @@ Remaining:
 
 Remaining:
 
-- Apply migration 0005 to production
-- Configure Stripe products and Worker runtime secrets
+- Configure and verify the Stripe sandbox Customer Portal
 - Complete Stripe test-mode checkout, renewal, cancellation, and refund verification
 - Reconciliation and operator tooling
 - Abuse monitoring and provider-cost guardrails
