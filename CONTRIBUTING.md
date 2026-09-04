@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in Instruxa. The project is currently owner-led and commercial rights are reserved.
+Thank you for your interest in Instruxa. The project is currently owner-led and its source code is available under the [Elastic License 2.0](LICENSE).
 
 ## Before opening a pull request
 
@@ -29,4 +29,8 @@ Before submitting:
 - Update documentation when architecture or setup changes.
 - Confirm keyboard, mobile, reduced-motion, and error states for UI work.
 
-Submitting a contribution does not grant a license to reuse the project commercially, and acceptance is at the owner's discretion.
+## Contribution licensing
+
+Unless a separate written agreement applies, a contribution accepted into this repository is made available under the Elastic License 2.0. By submitting a contribution, you represent that you have the right to provide it on those terms. Copyright ownership is not transferred merely by submitting a contribution.
+
+Material contributions may require a separate contributor agreement before acceptance. Acceptance remains at the owner's discretion.
