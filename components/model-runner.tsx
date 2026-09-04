@@ -38,7 +38,7 @@ function Markdown({text}:{text:string}){
   const item=line.match(/^\s*[-*]\s+(.+)$/);if(item){list.push(item[1]);return}
   flushList();if(!line.trim()){blocks.push(<div className="md-gap" key={index}/>);return}
   blocks.push(<p key={index}>{inline(line)}</p>);
- });flushList();if(code)blocks.push(<pre key="code-last"><code>{code.join("\n")}</code></pre>);
+ });flushList();const trailingCode=code as string[]|null;if(trailingCode)blocks.push(<pre key="code-last"><code>{trailingCode.join("\n")}</code></pre>);
  return <div className="model-markdown">{blocks}</div>;
 }
 
