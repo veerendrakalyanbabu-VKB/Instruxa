@@ -36,6 +36,7 @@ const safePlan = (value: unknown): PlanId => value === "pro" || value === "team"
 const stripeId = (value: unknown) => typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String((value as { id: unknown }).id) : null;
 const unixDate = (value: unknown) => Number(value) > 0 ? new Date(Number(value) * 1000).toISOString() : null;
 const sha256 = async (value: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, "0")).join("");
+const integrationIdentifier = () => `instruxa_${Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => String.fromCharCode(97 + byte % 26)).join("")}`;
 
 function publicCatalog(env: BillingEnv) {
   const ready = stripeRuntimeReady(env);
@@ -174,6 +175,7 @@ export async function handleBillingApi(request: Request, env: BillingEnv, user: 
       if (kind === "subscription" && existing?.subscriptionId && ["active", "trialing", "past_due"].includes(existing.status)) return json({ error: "Use Manage billing to change an existing subscription safely." }, 409);
       const values: Record<string, string> = {
         mode: kind === "subscription" ? "subscription" : "payment",
+        integration_identifier: integrationIdentifier(),
         "line_items[0][price]": priceId,
         "line_items[0][quantity]": "1",
         success_url: `${origin}/?billing=success#billing`,
