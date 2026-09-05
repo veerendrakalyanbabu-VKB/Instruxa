@@ -31,6 +31,8 @@ jobs:
         run: npm run lint
       - name: Type check
         run: npm run typecheck
+      - name: Unit and regression tests
+        run: node --test tests/*.test.mjs
       - name: Validate production Worker build
         shell: bash
         run: |
