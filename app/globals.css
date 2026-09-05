@@ -57,3 +57,29 @@
 /* Public policy and trust center */
 .legal-shell{position:relative;min-height:100vh;overflow:hidden;background:#060609;color:#f4f4f5}.legal-aurora{position:absolute;left:50%;top:-470px;width:1000px;height:760px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,#7c3aed35,transparent 67%);filter:blur(70px);pointer-events:none}.legal-nav{position:relative;z-index:2;display:flex;width:min(980px,calc(100% - 32px));align-items:center;justify-content:space-between;margin:18px auto;padding:12px 14px;border:1px solid #ffffff12;border-radius:16px;background:#09090dc7;backdrop-filter:blur(18px)}.legal-nav>a:last-child{display:flex;align-items:center;gap:6px;color:#858590;font-size:10px}.legal-nav>a:last-child:hover{color:#ddd6fe}.legal-brand{display:flex;align-items:center;gap:9px}.legal-brand strong{font-size:15px}.legal-brand small{border:1px solid #8b5cf637;border-radius:999px;background:#8b5cf60d;padding:3px 6px;color:#a78bfa;font-size:7px;letter-spacing:.1em}.legal-document{position:relative;z-index:2;width:min(860px,calc(100% - 32px));margin:70px auto 90px}.legal-document>header{text-align:center}.legal-document h1{max-width:760px;margin:14px auto 0;font-size:clamp(2.7rem,7vw,5.4rem);font-weight:520;line-height:1;letter-spacing:-.06em}.legal-document>header>p{max-width:650px;margin:22px auto 0;color:#8a8a96;font-size:14px;line-height:1.8}.legal-meta{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:18px;color:#5f8f7c;font-size:9px}.legal-meta svg{color:#34d399}.legal-document>aside{margin:48px 0 16px;border:1px solid #fbbf2426;border-radius:13px;background:#fbbf2407;padding:16px 18px}.legal-document>aside strong{color:#fcd34d;font-size:10px;text-transform:uppercase;letter-spacing:.1em}.legal-document>aside p{margin-top:5px;color:#9a8150;font-size:10px;line-height:1.6}.legal-sections{overflow:hidden;border:1px solid #ffffff0f;border-radius:17px;background:#09090d}.legal-sections section{padding:25px;border-bottom:1px solid #ffffff0b}.legal-sections section:last-child{border:0}.legal-sections h2{margin:0 0 12px;color:#e4e4e7;font-size:15px;font-weight:600}.legal-sections section>div{display:grid;gap:10px;color:#898994;font-size:12px;line-height:1.8}.legal-sections p{margin:0}.legal-sections ul{display:grid;gap:7px;margin:0;padding-left:18px;list-style:disc}.legal-sections li::marker{color:#8b5cf6}.legal-sections a{color:#a78bfa;text-decoration:underline;text-underline-offset:3px}.legal-footer{position:relative;z-index:2;display:flex;width:min(980px,calc(100% - 32px));flex-direction:column;gap:12px;margin:auto;padding:24px 0;border-top:1px solid #ffffff0d;color:#555560;font-size:9px}.legal-footer>div{display:flex;flex-wrap:wrap;gap:17px}.legal-footer a{display:flex;align-items:center;gap:4px}.legal-footer a:hover{color:#a78bfa}
 @media(min-width:640px){.legal-sections section{padding:30px 34px}.legal-footer{flex-direction:row;justify-content:space-between}}
+/* Final Pro badge layout fix */
+.billing-plans article.recommended {
+  padding-top: 56px !important;
+}
+
+.billing-plans article.recommended > .plan-ribbon {
+  position: absolute !important;
+  top: 16px !important;
+  left: 20px !important;
+  right: auto !important;
+  z-index: 5 !important;
+  display: inline-flex !important;
+  width: max-content !important;
+  white-space: nowrap !important;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #a78bfa55;
+  border-radius: 999px;
+  background: #8b5cf620;
+  padding: 6px 9px;
+  color: #ddd6fe;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  line-height: 1;
+}
