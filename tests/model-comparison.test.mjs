@@ -13,3 +13,10 @@ test("provider errors redact API-key-shaped values before display", () => {
   assert.match(runner, /replace\(\/sk-/);
   assert.match(runner, /\[redacted\]/);
 });
+
+test("Gemini provides an honest zero-cost comparison fallback", () => {
+  assert.match(runner, /Response Lab challenger/);
+  assert.match(runner, /Free comparison complete across/);
+  assert.match(runner, /Paid providers were unavailable/);
+  assert.match(runner, /variantLabel: "Refined challenger"/);
+});
