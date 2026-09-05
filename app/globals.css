@@ -61,6 +61,10 @@
 .billing-plans article.recommended {
   padding-top: 56px !important;
 }
+/* Final Pro badge layout fix */
+.billing-plans article.recommended {
+  padding-top: 56px !important;
+}
 
 .billing-plans article.recommended > .plan-ribbon {
   position: absolute !important;
