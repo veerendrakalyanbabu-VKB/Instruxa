@@ -319,3 +319,28 @@
   .motion-grid { transition: none; }
   .motion-particles i { opacity: .3; }
 }
+
+/* Capability cards keep their copy readable before any hover interaction. */
+.capability-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.capability-grid .feature {
+  min-height: 220px;
+  opacity: 1;
+}
+.capability-grid .feature h3 {
+  color: #f4f4f5;
+}
+.capability-grid .feature p {
+  color: #a1a1ad;
+  opacity: 1;
+}
+.capability-grid .feature:hover p {
+  color: #dedee6;
+}
+@media (min-width: 768px) {
+  .capability-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
