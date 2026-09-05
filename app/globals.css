@@ -344,3 +344,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+.capabilities-section {
+  position: relative;
+  z-index: 3;
+}
