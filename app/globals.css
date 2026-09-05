@@ -87,3 +87,9 @@
   letter-spacing: 0.11em;
   line-height: 1;
 }
+@media (min-width: 1380px) {
+  .studio-section .pill-a {
+    top: 18px;
+    left: -56px;
+  }
+}
