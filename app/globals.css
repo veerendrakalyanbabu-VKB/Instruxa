@@ -87,6 +87,27 @@
   letter-spacing: 0.11em;
   line-height: 1;
 }
+
+/* Pricing information must remain legible without hover or pointer focus. */
+.billing-plans article .plan-audience,
+.billing-plans article footer,
+.credit-store p,
+.credit-packs small {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.billing-plans article .plan-audience {
+  color: #c4b5fd !important;
+}
+.billing-plans article footer {
+  color: #858592 !important;
+}
+.credit-store p {
+  color: #a1a1ad !important;
+}
+.credit-packs small {
+  color: #858592 !important;
+}
 @media (min-width: 1380px) {
   .studio-section .pill-a {
     top: 18px;
