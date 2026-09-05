@@ -320,6 +320,7 @@
   .motion-particles i { opacity: .3; }
 }
 
+
 /* Capability cards keep their copy readable before any hover interaction. */
 .capability-grid {
   display: grid;
@@ -347,4 +348,30 @@
 .capabilities-section {
   position: relative;
   z-index: 3;
+}
+
+.site-footer {
+  position: relative;
+  z-index: 3;
+  background: linear-gradient(180deg, #08080d 0%, #060609 100%);
+}
+.site-footer-heading {
+  margin-bottom: 14px;
+  color: #a1a1aa;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.site-footer-links {
+  display: grid;
+  gap: 11px;
+  color: #71717a;
+  font-size: 12px;
+}
+.site-footer-links a { transition: color .2s ease; }
+.site-footer-links a:hover { color: #c4b5fd; }
+.site-footer-bottom {
+  border-top: 1px solid #ffffff0b;
+  color: #52525b;
 }
